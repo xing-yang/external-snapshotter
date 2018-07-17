@@ -33,53 +33,55 @@ const (
 	SnapshotClassResourcePlural = "snapshotclasses"
 )
 
-// VolumeSnapshotStatus is the status of the VolumeSnapshot
-type VolumeSnapshotStatus struct {
+type VolumeSnapshotCreated struct {
 	// The time the snapshot was successfully created
 	// +optional
-	CreationTimestamp metav1.Time `json:"creationTimestamp" protobuf:"bytes,1,opt,name=creationTimestamp"`
-
-	// Represent the latest available observations about the volume snapshot
-	Conditions []VolumeSnapshotCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
+	CreatedAt metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 }
 
-// VolumeSnapshotConditionType is the type of VolumeSnapshot conditions
-type VolumeSnapshotConditionType string
+type VolumeSnapshotAvailable struct {
+	// The time the snapshot was successfully created and available for use
+	// +optional
+	AvailableAt metav1.Time `json:"availableAt" protobuf:"bytes,1,opt,name=availableAt"`
+}
 
-// These are valid conditions of a volume snapshot.
-const (
-	// If VolumeSnapshotConditionType is "Created" and ConditionStatus is True, it means
-	// the snapshot is created.
-	// If VolumeSnapshotConditionType is "Created" and ConditionStatus is False, it means
-	// the snapshot is not created yet.
-	VolumeSnapshotConditionCreated VolumeSnapshotConditionType = "Created"
-	// If VolumeSnapshotConditionType is "Available" and ConditionStatus is True, it means
-	// the snapshot is created and available to be used.
-	// If VolumeSnapshotConditionType is "Available" and ConditionStatus is False, it means
-	// the snapshot is created, application can be resumed if it was previously frozen, but
-	// the snapshot is not available to be used yet. In this case, it is possible that the
-	// snapshot is being uploaded to the cloud. For example, both GCE and AWS support
-	// uploading of the snapshot after it is cut as part of the Create Snapshot process.
-	VolumeSnapshotConditionAvailable VolumeSnapshotConditionType = "Available"
-	// VolumeSnapshotConditionError means an error occurred during snapshot creation.
-	VolumeSnapshotConditionError VolumeSnapshotConditionType = "Error"
-)
+type VolumeSnapshotError struct {
+	// A brief CamelCase string indicating details about why the snapshot is in error state.
+	// +optional
+	Reason string
+	// A human-readable message indicating details about why the snapshot is in error state.
+	// +optional
+	Message string
+	// The time the error occurred during the snapshot creation (or uploading) process
+	// +optional
+	FailedAt metav1.Time `json:"failedAt" protobuf:"bytes,1,opt,name=failedAt"`
+}
 
-// VolumeSnapshotCondition describes the state of a volume snapshot.
-type VolumeSnapshotCondition struct {
-	// Type of replication controller condition.
-	Type VolumeSnapshotConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=VolumeSnapshotConditionType"`
-	// Status of the condition, one of True, False, Unknown.
-	Status core_v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
-	// The last time the condition transitioned from one status to another.
+// VolumeSnapshotStatus is the status of the VolumeSnapshot
+type VolumeSnapshotStatus struct {
+	// VolumeSnapshotCreated indicates whether the snapshot was successfully created.
+	// If the timestamp CreateAt is set, it means the snapshot was created;
+	// Otherwise the snapshot was not created.
 	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime" protobuf:"bytes,3,opt,name=lastTransitionTime"`
-	// The reason for the condition's last transition.
+	Created VolumeSnapshotCreated
+
+	// VolumeSnapshotAvailable indicates whether the snapshot was available for use.
+	// A snapshot MUST have already been created before it can be available.
+	// If a snapshot was available, it indicates the snapshot was created.
+	// When the snapshot was created but not available yet, the application can be
+	// resumed if it was previously frozen before taking the snapshot. In this case,
+	// it is possible that the snapshot is being uploaded to the cloud. For example,
+	// both GCE and AWS support uploading of the snapshot after it is cut as part of
+	// the Create Snapshot process.
+	// If the timestamp AvailableAt is set, it means the snapshot was available;
+	// Otherwise the snapshot was not available.
 	// +optional
-	Reason string `json:"reason" protobuf:"bytes,4,opt,name=reason"`
-	// A human readable message indicating details about the transition.
+	Available VolumeSnapshotAvailable
+
+	// VolumeSnapshotError indicates an error occurred during the snapshot creation
+	// (or uploading) process.
 	// +optional
-	Message string `json:"message" protobuf:"bytes,5,opt,name=message"`
+	Error VolumeSnapshotError
 }
 
 // +genclient
