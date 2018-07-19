@@ -27,8 +27,8 @@ import (
 
 type VolumesnapshotV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	SnapshotClassesGetter
 	VolumeSnapshotsGetter
+	VolumeSnapshotClassesGetter
 	VolumeSnapshotContentsGetter
 }
 
@@ -37,12 +37,12 @@ type VolumesnapshotV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *VolumesnapshotV1alpha1Client) SnapshotClasses() SnapshotClassInterface {
-	return newSnapshotClasses(c)
-}
-
 func (c *VolumesnapshotV1alpha1Client) VolumeSnapshots(namespace string) VolumeSnapshotInterface {
 	return newVolumeSnapshots(c, namespace)
+}
+
+func (c *VolumesnapshotV1alpha1Client) VolumeSnapshotClasses() VolumeSnapshotClassInterface {
+	return newVolumeSnapshotClasses(c)
 }
 
 func (c *VolumesnapshotV1alpha1Client) VolumeSnapshotContents() VolumeSnapshotContentInterface {

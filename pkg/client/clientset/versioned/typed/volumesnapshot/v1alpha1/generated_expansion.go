@@ -18,8 +18,8 @@ limitations under the License.
 
 package v1alpha1
 
-type SnapshotClassExpansion interface{}
-
 type VolumeSnapshotExpansion interface{}
+
+type VolumeSnapshotClassExpansion interface{}
 
 type VolumeSnapshotContentExpansion interface{}
