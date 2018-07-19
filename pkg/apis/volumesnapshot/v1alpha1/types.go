@@ -29,44 +29,19 @@ const (
 	VolumeSnapshotContentResourcePlural = "volumesnapshotcontents"
 	// VolumeSnapshotResourcePlural is "volumesnapshots"
 	VolumeSnapshotResourcePlural = "volumesnapshots"
-	// SnapshotClassResourcePlural is "snapshotclasss"
-	SnapshotClassResourcePlural = "snapshotclasses"
+	// VolumeSnapshotClassResourcePlural is "volumesnapshotclasses"
+	VolumeSnapshotClassResourcePlural = "volumesnapshotclasses"
 )
-
-type VolumeSnapshotCreated struct {
-	// The time the snapshot was successfully created
-	// +optional
-	CreatedAt metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
-}
-
-type VolumeSnapshotAvailable struct {
-	// The time the snapshot was successfully created and available for use
-	// +optional
-	AvailableAt metav1.Time `json:"availableAt" protobuf:"bytes,1,opt,name=availableAt"`
-}
-
-type VolumeSnapshotError struct {
-	// A brief CamelCase string indicating details about why the snapshot is in error state.
-	// +optional
-	Reason string
-	// A human-readable message indicating details about why the snapshot is in error state.
-	// +optional
-	Message string
-	// The time the error occurred during the snapshot creation (or uploading) process
-	// +optional
-	FailedAt metav1.Time `json:"failedAt" protobuf:"bytes,1,opt,name=failedAt"`
-}
 
 // VolumeSnapshotStatus is the status of the VolumeSnapshot
 type VolumeSnapshotStatus struct {
-	// VolumeSnapshotCreated indicates whether the snapshot was successfully created.
-	// If the timestamp CreateAt is set, it means the snapshot was created;
-	// Otherwise the snapshot was not created.
+	// CreatedAt is the time the snapshot was successfully created. If it is set,
+	// it means the snapshot was created; Otherwise the snapshot was not created.
 	// +optional
-	Created VolumeSnapshotCreated
+	CreatedAt *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 
-	// VolumeSnapshotAvailable indicates whether the snapshot was available for use.
-	// A snapshot MUST have already been created before it can be available.
+	// AvailableAt is the time the snapshot was successfully created and available
+	// for use. A snapshot MUST have already been created before it can be available.
 	// If a snapshot was available, it indicates the snapshot was created.
 	// When the snapshot was created but not available yet, the application can be
 	// resumed if it was previously frozen before taking the snapshot. In this case,
@@ -76,12 +51,19 @@ type VolumeSnapshotStatus struct {
 	// If the timestamp AvailableAt is set, it means the snapshot was available;
 	// Otherwise the snapshot was not available.
 	// +optional
-	Available VolumeSnapshotAvailable
+	AvailableAt *metav1.Time `json:"availableAt" protobuf:"bytes,2,opt,name=availableAt"`
 
-	// VolumeSnapshotError indicates an error occurred during the snapshot creation
-	// (or uploading) process.
+	// The time the error occurred during the snapshot creation (or uploading) process
 	// +optional
-	Error VolumeSnapshotError
+	FailedAt *metav1.Time `json:"failedAt" protobuf:"bytes,3,opt,name=failedAt"`
+
+	// A brief CamelCase string indicating details about why the snapshot is in error state.
+	// +optional
+	Reason string
+
+	// A human-readable message indicating details about why the snapshot is in error state.
+	// +optional
+	Message string
 }
 
 // +genclient
@@ -127,28 +109,28 @@ type VolumeSnapshotSpec struct {
 	// +optional
 	SnapshotDataName string `json:"snapshotDataName" protobuf:"bytes,2,opt,name=snapshotDataName"`
 
-	// Name of the SnapshotClass required by the volume snapshot.
+	// Name of the VolumeSnapshotClass required by the volume snapshot.
 	// +optional
-	SnapshotClassName string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
+	VolumeSnapshotClassName string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
 }
 
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SnapshotClass describes the parameters used by storage system when
+// VolumeSnapshotClass describes the parameters used by storage system when
 // provisioning VolumeSnapshots from PVCs.
 //
-// SnapshotClasses are non-namespaced; the name of the snapshot class
+// VolumeSnapshotClasses are non-namespaced; the name of the snapshot class
 // according to etcd is in ObjectMeta.Name.
-type SnapshotClass struct {
+type VolumeSnapshotClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Snapshotter is the driver expected to handle this SnapshotClass.
+	// Snapshotter is the driver expected to handle this VolumeSnapshotClass.
 	Snapshotter string `json:"snapshotter" protobuf:"bytes,2,opt,name=snapshotter"`
 
 	// Parameters holds parameters for the snapshotter.
@@ -160,16 +142,16 @@ type SnapshotClass struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SnapshotClassList is a collection of snapshot classes.
-type SnapshotClassList struct {
+// VolumeSnapshotClassList is a collection of snapshot classes.
+type VolumeSnapshotClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of SnapshotClasses
-	Items []SnapshotClass `json:"items" protobuf:"bytes,2,rep,name=items"`
+	// Items is the list of VolumeSnapshotClasses
+	Items []VolumeSnapshotClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient
