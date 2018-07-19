@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// SnapshotClassListerExpansion allows custom methods to be added to
-// SnapshotClassLister.
-type SnapshotClassListerExpansion interface{}
-
 // VolumeSnapshotListerExpansion allows custom methods to be added to
 // VolumeSnapshotLister.
 type VolumeSnapshotListerExpansion interface{}
@@ -29,6 +25,10 @@ type VolumeSnapshotListerExpansion interface{}
 // VolumeSnapshotNamespaceListerExpansion allows custom methods to be added to
 // VolumeSnapshotNamespaceLister.
 type VolumeSnapshotNamespaceListerExpansion interface{}
+
+// VolumeSnapshotClassListerExpansion allows custom methods to be added to
+// VolumeSnapshotClassLister.
+type VolumeSnapshotClassListerExpansion interface{}
 
 // VolumeSnapshotContentListerExpansion allows custom methods to be added to
 // VolumeSnapshotContentLister.

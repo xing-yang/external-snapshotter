@@ -28,12 +28,12 @@ type FakeVolumesnapshotV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeVolumesnapshotV1alpha1) SnapshotClasses() v1alpha1.SnapshotClassInterface {
-	return &FakeSnapshotClasses{c}
-}
-
 func (c *FakeVolumesnapshotV1alpha1) VolumeSnapshots(namespace string) v1alpha1.VolumeSnapshotInterface {
 	return &FakeVolumeSnapshots{c, namespace}
+}
+
+func (c *FakeVolumesnapshotV1alpha1) VolumeSnapshotClasses() v1alpha1.VolumeSnapshotClassInterface {
+	return &FakeVolumeSnapshotClasses{c}
 }
 
 func (c *FakeVolumesnapshotV1alpha1) VolumeSnapshotContents() v1alpha1.VolumeSnapshotContentInterface {

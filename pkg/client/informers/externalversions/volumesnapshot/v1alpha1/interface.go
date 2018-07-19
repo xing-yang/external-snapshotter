@@ -24,10 +24,10 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// SnapshotClasses returns a SnapshotClassInformer.
-	SnapshotClasses() SnapshotClassInformer
 	// VolumeSnapshots returns a VolumeSnapshotInformer.
 	VolumeSnapshots() VolumeSnapshotInformer
+	// VolumeSnapshotClasses returns a VolumeSnapshotClassInformer.
+	VolumeSnapshotClasses() VolumeSnapshotClassInformer
 	// VolumeSnapshotContents returns a VolumeSnapshotContentInformer.
 	VolumeSnapshotContents() VolumeSnapshotContentInformer
 }
@@ -43,14 +43,14 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// SnapshotClasses returns a SnapshotClassInformer.
-func (v *version) SnapshotClasses() SnapshotClassInformer {
-	return &snapshotClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
 // VolumeSnapshots returns a VolumeSnapshotInformer.
 func (v *version) VolumeSnapshots() VolumeSnapshotInformer {
 	return &volumeSnapshotInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// VolumeSnapshotClasses returns a VolumeSnapshotClassInformer.
+func (v *version) VolumeSnapshotClasses() VolumeSnapshotClassInformer {
+	return &volumeSnapshotClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // VolumeSnapshotContents returns a VolumeSnapshotContentInformer.
