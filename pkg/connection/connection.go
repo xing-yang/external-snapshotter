@@ -53,7 +53,7 @@ type CSIConnection interface {
 	DeleteSnapshot(ctx context.Context, snapshotID string) (err error)
 
 	// ListSnapshots lists snapshot from a volume
-	ListSnapshots(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, error)
+	ListSnapshots(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, int64, error)
 
 	// Probe checks that the CSI driver is ready to process requests
 	Probe(ctx context.Context) error
@@ -233,7 +233,7 @@ func (c *csiConnection) DeleteSnapshot(ctx context.Context, snapshotID string) (
 	return nil
 }
 
-func (c *csiConnection) ListSnapshots(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, error) {
+func (c *csiConnection) ListSnapshots(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, int64, error) {
 	client := csi.NewControllerClient(c.conn)
 
 	req := csi.ListSnapshotsRequest{
@@ -242,14 +242,14 @@ func (c *csiConnection) ListSnapshots(ctx context.Context, snapshotID string) (*
 
 	rsp, err := client.ListSnapshots(ctx, &req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if rsp.Entries == nil || len(rsp.Entries) == 0 {
-		return nil, fmt.Errorf("can not find snapshot for snapshotID %s", snapshotID)
+		return nil, 0, fmt.Errorf("can not find snapshot for snapshotID %s", snapshotID)
 	}
 
-	return rsp.Entries[0].Snapshot.Status, nil
+	return rsp.Entries[0].Snapshot.Status, rsp.Entries[0].Snapshot.CreatedAt, nil
 }
 
 func (c *csiConnection) Close() error {
