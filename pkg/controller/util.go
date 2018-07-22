@@ -107,46 +107,37 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 	return true, nil
 }
 
-// ConvertSnapshotStatus converts snapshot status to crdv1.VolumeSnapshotCondition
-func ConvertSnapshotStatus(status *csi.SnapshotStatus) crdv1.VolumeSnapshotCondition {
-	var snapDataCondition crdv1.VolumeSnapshotCondition
+// ConvertSnapshotStatus converts CSI snapshot status to crdv1.VolumeSnapshotStatus
+func ConvertSnapshotStatus(status *csi.SnapshotStatus, timestamp int64) crdv1.VolumeSnapshotStatus {
+	var snapDataStatus crdv1.VolumeSnapshotStatus
 
 	switch status.Type {
 	case csi.SnapshotStatus_READY:
-		snapDataCondition = crdv1.VolumeSnapshotCondition{
-			Type:               crdv1.VolumeSnapshotConditionReady,
-			Status:             v1.ConditionTrue,
-			Message:            status.Details,
-			LastTransitionTime: metav1.Now(),
+		timeCreated := metav1.Unix(0, timestamp)
+		timeNow := metav1.Now()
+		snapDataStatus = crdv1.VolumeSnapshotStatus{
+			CreatedAt:   &timeCreated,
+			AvailableAt: &timeNow,
 		}
 	case csi.SnapshotStatus_ERROR_UPLOADING:
-		snapDataCondition = crdv1.VolumeSnapshotCondition{
-			Type:               crdv1.VolumeSnapshotConditionError,
-			Status:             v1.ConditionTrue,
-			Message:            status.Details,
-			LastTransitionTime: metav1.Now(),
+		timeNow := metav1.Now()
+		snapDataStatus = crdv1.VolumeSnapshotStatus{
+			FailedAt: &timeNow,
+			Reason:   "CreateSnapshotFailure",
+			Message:  status.Details,
 		}
 	case csi.SnapshotStatus_UPLOADING:
-		snapDataCondition = crdv1.VolumeSnapshotCondition{
-			Type:               crdv1.VolumeSnapshotConditionUploading,
-			Status:             v1.ConditionTrue,
-			Message:            status.Details,
-			LastTransitionTime: metav1.Now(),
-		}
-	case csi.SnapshotStatus_UNKNOWN:
-		snapDataCondition = crdv1.VolumeSnapshotCondition{
-			Type:               crdv1.VolumeSnapshotConditionCreating,
-			Status:             v1.ConditionUnknown,
-			Message:            status.Details,
-			LastTransitionTime: metav1.Now(),
+		timeCreated := metav1.Unix(0, timestamp)
+		snapDataStatus = crdv1.VolumeSnapshotStatus{
+			CreatedAt: &timeCreated,
 		}
 	}
 
-	return snapDataCondition
+	return snapDataStatus
 }
 
-// getSnapshotDataNameForSnapshot returns SnapshotData.Name for the create VolumeSnapshotData.
+// getSnapshotContentNameForSnapshot returns SnapshotData.Name for the create VolumeSnapshotContent.
 // The name must be unique.
-func GetSnapshotDataNameForSnapshot(snapshot *crdv1.VolumeSnapshot) string {
+func GetSnapshotContentNameForSnapshot(snapshot *crdv1.VolumeSnapshot) string {
 	return "snapdata-" + string(snapshot.UID)
 }

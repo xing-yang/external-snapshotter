@@ -59,15 +59,15 @@ func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 func CreateCRD(clientset apiextensionsclient.Interface) error {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crdv1.SnapshotClassResourcePlural + "." + crdv1.GroupName,
+			Name: crdv1.VolumeSnapshotClassResourcePlural + "." + crdv1.GroupName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   crdv1.GroupName,
 			Version: crdv1.SchemeGroupVersion.Version,
 			Scope:   apiextensionsv1beta1.ClusterScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: crdv1.SnapshotClassResourcePlural,
-				Kind:   reflect.TypeOf(crdv1.SnapshotClass{}).Name(),
+				Plural: crdv1.VolumeSnapshotClassResourcePlural,
+				Kind:   reflect.TypeOf(crdv1.VolumeSnapshotClass{}).Name(),
 			},
 		},
 	}
@@ -80,22 +80,22 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 
 	crd = &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crdv1.VolumeSnapshotDataResourcePlural + "." + crdv1.GroupName,
+			Name: crdv1.VolumeSnapshotContentResourcePlural + "." + crdv1.GroupName,
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   crdv1.GroupName,
 			Version: crdv1.SchemeGroupVersion.Version,
 			Scope:   apiextensionsv1beta1.ClusterScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: crdv1.VolumeSnapshotDataResourcePlural,
-				Kind:   reflect.TypeOf(crdv1.VolumeSnapshotData{}).Name(),
+				Plural: crdv1.VolumeSnapshotContentResourcePlural,
+				Kind:   reflect.TypeOf(crdv1.VolumeSnapshotContent{}).Name(),
 			},
 		},
 	}
 	res, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		glog.Fatalf("failed to create VolumeSnapshotDataResource: %#v, err: %#v",
+		glog.Fatalf("failed to create VolumeSnapshotContentResource: %#v, err: %#v",
 			res, err)
 	}
 
@@ -127,7 +127,7 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 func WaitForSnapshotResource(snapshotClient *rest.RESTClient) error {
 	return wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 		_, err := snapshotClient.Get().
-			Resource(crdv1.VolumeSnapshotDataResourcePlural).DoRaw()
+			Resource(crdv1.VolumeSnapshotContentResourcePlural).DoRaw()
 		if err == nil {
 			return true, nil
 		}
