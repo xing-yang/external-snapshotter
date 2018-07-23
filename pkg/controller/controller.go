@@ -425,7 +425,7 @@ func (ctrl *CSISnapshotController) syncVS(vs *crdv1.VolumeSnapshot) error {
 
 	// vs has not been bound
 	glog.V(5).Infof("syncVS %s", uniqueSnapshotName)
-	if vs.Spec.SnapshotDataName == "" {
+	if vs.Spec.SnapshotContentName == "" {
 		var snapshotDataObj *crdv1.VolumeSnapshotContent
 		// Check whether snapshotData object is already created or not. If yes, snapshot is already
 		// triggered through cloud provider, bind it and return pending state
@@ -448,17 +448,17 @@ func (ctrl *CSISnapshotController) syncVS(vs *crdv1.VolumeSnapshot) error {
 		}
 		return nil
 	} else {
-		obj, found, err := ctrl.vsdStore.GetByKey(vs.Spec.SnapshotDataName)
+		obj, found, err := ctrl.vsdStore.GetByKey(vs.Spec.SnapshotContentName)
 		if err != nil {
 			return err
 		}
 		if !found {
 			// vs is bound to a non-existing vsd.
-			return fmt.Errorf("snapshot %s is bound to a non-existing vsd %s", uniqueSnapshotName, vs.Spec.SnapshotDataName)
+			return fmt.Errorf("snapshot %s is bound to a non-existing vsd %s", uniqueSnapshotName, vs.Spec.SnapshotContentName)
 		}
 		vsd, ok := obj.(*crdv1.VolumeSnapshotContent)
 		if !ok {
-			return fmt.Errorf("cannot convert object from vsd cache to vsd %q!?: %#v", vs.Spec.SnapshotDataName, obj)
+			return fmt.Errorf("cannot convert object from vsd cache to vsd %q!?: %#v", vs.Spec.SnapshotContentName, obj)
 		}
 		status := ctrl.handler.GetSimplifiedSnapshotStatus(&(vs.Status))
 
@@ -535,16 +535,16 @@ func (ctrl *CSISnapshotController) deleteVS(vs *crdv1.VolumeSnapshot) {
 	_ = ctrl.vsStore.Delete(vs)
 	glog.V(4).Infof("vs %q deleted", vsToVsKey(vs))
 
-	snapshotDataName := vs.Spec.SnapshotDataName
-	if snapshotDataName == "" {
+	snapshotContentName := vs.Spec.SnapshotContentName
+	if snapshotContentName == "" {
 		glog.V(5).Infof("deleteVS[%q]: vsd not bound", vsToVsKey(vs))
 		return
 	}
 	// sync the vsd when its vs is deleted.  Explicitly sync'ing the
 	// vsd here in response to vs deletion prevents the vsd from
 	// waiting until the next sync period for its Release.
-	glog.V(5).Infof("deleteVS[%q]: scheduling sync of vsd %s", vsToVsKey(vs), snapshotDataName)
-	ctrl.vsdQueue.Add(snapshotDataName)
+	glog.V(5).Infof("deleteVS[%q]: scheduling sync of vsd %s", vsToVsKey(vs), snapshotContentName)
+	ctrl.vsdQueue.Add(snapshotContentName)
 }
 
 // deleteVSD runs in worker thread and handles "snapshot deleted" event.
