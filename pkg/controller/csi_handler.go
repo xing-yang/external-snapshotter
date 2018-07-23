@@ -38,7 +38,7 @@ type Handler interface {
 	CreateSnapshotOperation(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error)
 	DeleteSnapshotContentOperation(vsd *crdv1.VolumeSnapshotContent) error
 	ListSnapshots(vsd *crdv1.VolumeSnapshotContent) (*csi.SnapshotStatus, int64, error)
-	BindandUpdateVolumeSnapshot(snapshotData *crdv1.VolumeSnapshotContent, snapshot *crdv1.VolumeSnapshot, status *crdv1.VolumeSnapshotStatus) (*crdv1.VolumeSnapshot, error)
+	BindandUpdateVolumeSnapshot(snapshotContent *crdv1.VolumeSnapshotContent, snapshot *crdv1.VolumeSnapshot, status *crdv1.VolumeSnapshotStatus) (*crdv1.VolumeSnapshot, error)
 	GetClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshotClass, error)
 	UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSnapshot, status *crdv1.VolumeSnapshotStatus) (*crdv1.VolumeSnapshot, error)
 	GetSimplifiedSnapshotStatus(status *crdv1.VolumeSnapshotStatus) string
@@ -93,7 +93,7 @@ func (handler *csiHandler) takeSnapshot(snapshot *crdv1.VolumeSnapshot,
 	snapDataName := GetSnapshotContentNameForSnapshot(snapshot)
 
 	// Create VolumeSnapshotContent in the database
-	snapshotData := &crdv1.VolumeSnapshotContent{
+	snapshotContent := &crdv1.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: snapDataName,
 		},
@@ -121,8 +121,8 @@ func (handler *csiHandler) takeSnapshot(snapshot *crdv1.VolumeSnapshot,
 
 	status := ConvertSnapshotStatus(csiSnapshotStatus, timestamp)
 
-	glog.V(5).Infof("takeSnapshot: Created snapshot [%s]. Snapshot object [%#v] Status [%#v]", snapshot.Name, snapshotData, status)
-	return snapshotData, &status, nil
+	glog.V(5).Infof("takeSnapshot: Created snapshot [%s]. Snapshot object [%#v] Status [%#v]", snapshot.Name, snapshotContent, status)
+	return snapshotContent, &status, nil
 }
 
 func (handler *csiHandler) deleteSnapshot(vsd *crdv1.VolumeSnapshotContent) error {
@@ -189,26 +189,26 @@ func (handler *csiHandler) CreateSnapshotOperation(snapshot *crdv1.VolumeSnapsho
 		glog.Errorf("createSnapshotOperation failed [%s]: Error: [%#v]", snapshot.Name, err)
 		return nil, err
 	}
-	snapshotData, status, err := handler.takeSnapshot(snapshot, volume, class.Parameters)
+	snapshotContent, status, err := handler.takeSnapshot(snapshot, volume, class.Parameters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to take snapshot of the volume %s: %q", volume.Name, err)
 	}
 
 	// Try to create the VSD object several times
 	for i := 0; i < handler.createSnapshotContentRetryCount; i++ {
-		glog.V(4).Infof("createSnapshot [%s]: trying to save volume snapshot data %s", vsToVsKey(snapshot), snapshotData.Name)
-		if _, err = handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshotContents().Create(snapshotData); err == nil || apierrs.IsAlreadyExists(err) {
+		glog.V(4).Infof("createSnapshot [%s]: trying to save volume snapshot data %s", vsToVsKey(snapshot), snapshotContent.Name)
+		if _, err = handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshotContents().Create(snapshotContent); err == nil || apierrs.IsAlreadyExists(err) {
 			// Save succeeded.
 			if err != nil {
-				glog.V(3).Infof("volume snapshot data %q for snapshot %q already exists, reusing", snapshotData.Name, vsToVsKey(snapshot))
+				glog.V(3).Infof("volume snapshot data %q for snapshot %q already exists, reusing", snapshotContent.Name, vsToVsKey(snapshot))
 				err = nil
 			} else {
-				glog.V(3).Infof("volume snapshot data %q for snapshot %q saved", snapshotData.Name, vsToVsKey(snapshot))
+				glog.V(3).Infof("volume snapshot data %q for snapshot %q saved", snapshotContent.Name, vsToVsKey(snapshot))
 			}
 			break
 		}
 		// Save failed, try again after a while.
-		glog.V(3).Infof("failed to save volume snapshot data %q for snapshot %q: %v", snapshotData.Name, vsToVsKey(snapshot), err)
+		glog.V(3).Infof("failed to save volume snapshot data %q for snapshot %q: %v", snapshotContent.Name, vsToVsKey(snapshot), err)
 		time.Sleep(handler.createSnapshotContentInterval)
 	}
 
@@ -222,13 +222,13 @@ func (handler *csiHandler) CreateSnapshotOperation(snapshot *crdv1.VolumeSnapsho
 		handler.eventRecorder.Event(snapshot, v1.EventTypeWarning, "CreateSnapshotContentFailed", strerr)
 
 		for i := 0; i < handler.createSnapshotContentRetryCount; i++ {
-			if err = handler.deleteSnapshot(snapshotData); err == nil {
+			if err = handler.deleteSnapshot(snapshotContent); err == nil {
 				// Delete succeeded
-				glog.V(4).Infof("createSnapshot [%s]: cleaning snapshot data %s succeeded", vsToVsKey(snapshot), snapshotData.Name)
+				glog.V(4).Infof("createSnapshot [%s]: cleaning snapshot data %s succeeded", vsToVsKey(snapshot), snapshotContent.Name)
 				break
 			}
 			// Delete failed, try again after a while.
-			glog.Infof("failed to delete snapshot data %q: %v", snapshotData.Name, err)
+			glog.Infof("failed to delete snapshot data %q: %v", snapshotContent.Name, err)
 			time.Sleep(handler.createSnapshotContentInterval)
 		}
 
@@ -241,7 +241,7 @@ func (handler *csiHandler) CreateSnapshotOperation(snapshot *crdv1.VolumeSnapsho
 		}
 	} else {
 		// save succeeded, bind and update status for snapshot.
-		result, err = handler.BindandUpdateVolumeSnapshot(snapshotData, snapshot, status)
+		result, err = handler.BindandUpdateVolumeSnapshot(snapshotContent, snapshot, status)
 		if err != nil {
 			return nil, err
 		}
@@ -273,8 +273,8 @@ func (handler *csiHandler) DeleteSnapshotContentOperation(vsd *crdv1.VolumeSnaps
 	return nil
 }
 
-func (handler *csiHandler) BindandUpdateVolumeSnapshot(snapshotData *crdv1.VolumeSnapshotContent, snapshot *crdv1.VolumeSnapshot, status *crdv1.VolumeSnapshotStatus) (*crdv1.VolumeSnapshot, error) {
-	glog.V(4).Infof("bindandUpdateVolumeSnapshot for snapshot [%s]: snapshotData [%s] status [%#v]", snapshot.Name, snapshotData.Name, status)
+func (handler *csiHandler) BindandUpdateVolumeSnapshot(snapshotContent *crdv1.VolumeSnapshotContent, snapshot *crdv1.VolumeSnapshot, status *crdv1.VolumeSnapshotStatus) (*crdv1.VolumeSnapshot, error) {
+	glog.V(4).Infof("bindandUpdateVolumeSnapshot for snapshot [%s]: snapshotContent [%s] status [%#v]", snapshot.Name, snapshotContent.Name, status)
 	snapshotObj, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Get(snapshot.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error get snapshot %s from api server: %v", vsToVsKey(snapshot), err)
@@ -283,20 +283,20 @@ func (handler *csiHandler) BindandUpdateVolumeSnapshot(snapshotData *crdv1.Volum
 	// Copy the snapshot object before updating it
 	snapshotCopy := snapshotObj.DeepCopy()
 	var updateSnapshot *crdv1.VolumeSnapshot
-	if snapshotObj.Spec.SnapshotDataName == snapshotData.Name {
-		glog.Infof("bindVolumeSnapshotContentToVolumeSnapshot: VolumeSnapshot %s already bind to volumeSnapshotContent [%s]", snapshot.Name, snapshotData.Name)
+	if snapshotObj.Spec.SnapshotContentName == snapshotContent.Name {
+		glog.Infof("bindVolumeSnapshotContentToVolumeSnapshot: VolumeSnapshot %s already bind to volumeSnapshotContent [%s]", snapshot.Name, snapshotContent.Name)
 	} else {
-		glog.Infof("bindVolumeSnapshotContentToVolumeSnapshot: before bind VolumeSnapshot %s to volumeSnapshotContent [%s]", snapshot.Name, snapshotData.Name)
-		snapshotCopy.Spec.SnapshotDataName = snapshotData.Name
+		glog.Infof("bindVolumeSnapshotContentToVolumeSnapshot: before bind VolumeSnapshot %s to volumeSnapshotContent [%s]", snapshot.Name, snapshotContent.Name)
+		snapshotCopy.Spec.SnapshotContentName = snapshotContent.Name
 		updateSnapshot, err = handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshotCopy)
 		if err != nil {
-			glog.Infof("bindVolumeSnapshotContentToVolumeSnapshot: Error binding VolumeSnapshot %s to volumeSnapshotContent [%s]. Error [%#v]", snapshot.Name, snapshotData.Name, err)
+			glog.Infof("bindVolumeSnapshotContentToVolumeSnapshot: Error binding VolumeSnapshot %s to volumeSnapshotContent [%s]. Error [%#v]", snapshot.Name, snapshotContent.Name, err)
 			return nil, fmt.Errorf("error updating snapshot object %s on the API server: %v", vsToVsKey(updateSnapshot), err)
 		}
 		snapshotCopy = updateSnapshot
 	}
 
-	if status != nil && (status.CreatedAt != nil || status.AvailableAt != nil || status.FailedAt != nil) {
+	if status != nil && (status.CreatedAt != nil || status.AvailableAt != nil || status.Error != nil) {
 		snapshotCopy.Status = *(status.DeepCopy())
 		updateSnapshot2, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshotCopy)
 		if err != nil {
@@ -333,7 +333,7 @@ func (handler *csiHandler) GetSimplifiedSnapshotStatus(status *crdv1.VolumeSnaps
 		return statusNew
 	}
 
-	if status.FailedAt != nil {
+	if status.Error != nil {
 		return statusError
 	}
 	if status.AvailableAt != nil {
