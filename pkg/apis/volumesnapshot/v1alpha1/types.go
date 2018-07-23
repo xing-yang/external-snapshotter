@@ -17,11 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"encoding/json"
-
 	core_v1 "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -53,17 +51,11 @@ type VolumeSnapshotStatus struct {
 	// +optional
 	AvailableAt *metav1.Time `json:"availableAt" protobuf:"bytes,2,opt,name=availableAt"`
 
-	// The time the error occurred during the snapshot creation (or uploading) process
+	// The last error encountered during create snapshot operation, if any.
+	// This field must only be set by the entity completing the create snapshot
+	// operation, i.e. the external-snapshotter.
 	// +optional
-	FailedAt *metav1.Time `json:"failedAt" protobuf:"bytes,3,opt,name=failedAt"`
-
-	// A brief CamelCase string indicating details about why the snapshot is in error state.
-	// +optional
-	Reason string
-
-	// A human-readable message indicating details about why the snapshot is in error state.
-	// +optional
-	Message string
+	Error *storage.VolumeError
 }
 
 // +genclient
@@ -105,9 +97,9 @@ type VolumeSnapshotSpec struct {
 	// +optional
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName" protobuf:"bytes,1,opt,name=persistentVolumeClaimName"`
 
-	// SnapshotDataName binds the VolumeSnapshot object with the VolumeSnapshotContent
+	// SnapshotContentName binds the VolumeSnapshot object with the VolumeSnapshotContent
 	// +optional
-	SnapshotDataName string `json:"snapshotDataName" protobuf:"bytes,2,opt,name=snapshotDataName"`
+	SnapshotContentName string `json:"snapshotContentName" protobuf:"bytes,2,opt,name=snapshotContentName"`
 
 	// Name of the VolumeSnapshotClass required by the volume snapshot.
 	// +optional
@@ -223,94 +215,4 @@ type CSIVolumeSnapshotSource struct {
 	// the  current time in nanoseconds since 1970-01-01 00:00:00 UTC.
 	// This field is REQUIRED.
 	CreatedAt int64 `json:"createdAt,omitempty" protobuf:"varint,3,opt,name=createdAt"`
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (v *VolumeSnapshotContent) GetObjectKind() schema.ObjectKind {
-	return &v.TypeMeta
-}
-
-// GetObjectMeta is required to satisfy ObjectMetaAccessor interface
-func (v *VolumeSnapshotContent) GetObjectMeta() metav1.Object {
-	return &v.ObjectMeta
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (vd *VolumeSnapshotContentList) GetObjectKind() schema.ObjectKind {
-	return &vd.TypeMeta
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (v *VolumeSnapshot) GetObjectKind() schema.ObjectKind {
-	return &v.TypeMeta
-}
-
-// GetObjectMeta is required to satisfy ObjectMetaAccessor interface
-func (v *VolumeSnapshot) GetObjectMeta() metav1.Object {
-	return &v.ObjectMeta
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (vd *VolumeSnapshotList) GetObjectKind() schema.ObjectKind {
-	return &vd.TypeMeta
-}
-
-// VolumeSnapshotContentListCopy is a VolumeSnapshotContentList type
-type VolumeSnapshotContentListCopy VolumeSnapshotContentList
-
-// VolumeSnapshotContentCopy is a VolumeSnapshotContent type
-type VolumeSnapshotContentCopy VolumeSnapshotContent
-
-// VolumeSnapshotListCopy is a VolumeSnapshotList type
-type VolumeSnapshotListCopy VolumeSnapshotList
-
-// VolumeSnapshotCopy is a VolumeSnapshot type
-type VolumeSnapshotCopy VolumeSnapshot
-
-// UnmarshalJSON unmarshalls json data
-func (v *VolumeSnapshot) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshot(tmp)
-	*v = tmp2
-	return nil
-}
-
-// UnmarshalJSON unmarshals json data
-func (vd *VolumeSnapshotList) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshotList(tmp)
-	*vd = tmp2
-	return nil
-}
-
-// UnmarshalJSON unmarshals json data
-func (v *VolumeSnapshotContent) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotContentCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshotContent(tmp)
-	*v = tmp2
-	return nil
-}
-
-// UnmarshalJSON unmarshals json data
-func (vd *VolumeSnapshotContentList) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotContentListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshotContentList(tmp)
-	*vd = tmp2
-	return nil
 }
