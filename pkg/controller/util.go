@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -120,11 +121,12 @@ func ConvertSnapshotStatus(status *csi.SnapshotStatus, timestamp int64) crdv1.Vo
 			AvailableAt: &timeNow,
 		}
 	case csi.SnapshotStatus_ERROR_UPLOADING:
-		timeNow := metav1.Now()
+		err := storage.VolumeError{
+			Time:    metav1.Now(),
+			Message: status.Details,
+		}
 		snapDataStatus = crdv1.VolumeSnapshotStatus{
-			FailedAt: &timeNow,
-			Reason:   "CreateSnapshotFailure",
-			Message:  status.Details,
+			Error: &err,
 		}
 	case csi.SnapshotStatus_UPLOADING:
 		timeCreated := metav1.Unix(0, timestamp)
