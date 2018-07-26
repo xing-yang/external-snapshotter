@@ -203,8 +203,9 @@ func (c *csiConnection) CreateSnapshot(ctx context.Context, snapshot *crdv1.Volu
 	}
 
 	req := csi.CreateSnapshotRequest{
-		SourceVolumeId:        volume.Spec.CSI.VolumeHandle,
-		Name:                  snapshot.Name,
+		SourceVolumeId: volume.Spec.CSI.VolumeHandle,
+
+		Name:                  fmt.Sprintf("%v", snapshot.UID), // Use snapshot.UID instead of snapshot.Name because the same snapshot Name could be in different Namespaces.
 		Parameters:            parameters,
 		CreateSnapshotSecrets: nil,
 	}

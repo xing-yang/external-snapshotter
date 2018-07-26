@@ -86,7 +86,6 @@ func (handler *csiHandler) takeSnapshot(snapshot *crdv1.VolumeSnapshot,
 
 	driverName, snapshotId, timestamp, csiSnapshotStatus, err := handler.csiConnection.CreateSnapshot(ctx, snapshot, volume, parameters)
 	if err != nil {
-		// TODO: Handle Uploading gRPC error code 10
 		return nil, nil, fmt.Errorf("failed to take snapshot of the volume %s: %q", volume.Name, err)
 	}
 
