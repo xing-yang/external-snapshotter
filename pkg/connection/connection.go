@@ -52,8 +52,8 @@ type CSIConnection interface {
 	// DeleteSnapshot deletes a snapshot from a volume
 	DeleteSnapshot(ctx context.Context, snapshotID string) (err error)
 
-	// ListSnapshots lists snapshot from a volume
-	ListSnapshots(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, int64, error)
+	// GetSnapshotStatus lists snapshot from a volume
+	GetSnapshotStatus(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, int64, error)
 
 	// Probe checks that the CSI driver is ready to process requests
 	Probe(ctx context.Context) error
@@ -203,9 +203,8 @@ func (c *csiConnection) CreateSnapshot(ctx context.Context, snapshot *crdv1.Volu
 	}
 
 	req := csi.CreateSnapshotRequest{
-		SourceVolumeId: volume.Spec.CSI.VolumeHandle,
-
-		Name:                  fmt.Sprintf("%v", snapshot.UID), // Use snapshot.UID instead of snapshot.Name because the same snapshot Name could be in different Namespaces.
+		SourceVolumeId:        volume.Spec.CSI.VolumeHandle,
+		Name:                  string(snapshot.UID),
 		Parameters:            parameters,
 		CreateSnapshotSecrets: nil,
 	}
@@ -234,7 +233,7 @@ func (c *csiConnection) DeleteSnapshot(ctx context.Context, snapshotID string) (
 	return nil
 }
 
-func (c *csiConnection) ListSnapshots(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, int64, error) {
+func (c *csiConnection) GetSnapshotStatus(ctx context.Context, snapshotID string) (*csi.SnapshotStatus, int64, error) {
 	client := csi.NewControllerClient(c.conn)
 
 	req := csi.ListSnapshotsRequest{
