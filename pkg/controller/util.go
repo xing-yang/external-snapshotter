@@ -18,13 +18,10 @@ package controller
 
 import (
 	"fmt"
-	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	"strconv"
 	"strings"
@@ -44,11 +41,11 @@ func GetNameAndNameSpaceFromSnapshotName(name string) (string, string, error) {
 	return strs[0], strs[1], nil
 }
 
-func vsToVsKey(vs *crdv1.VolumeSnapshot) string {
+func snapshotKey(vs *crdv1.VolumeSnapshot) string {
 	return fmt.Sprintf("%s/%s", vs.Namespace, vs.Name)
 }
 
-func vsrefToVsKey(vsref *v1.ObjectReference) string {
+func snapshotRefKey(vsref *v1.ObjectReference) string {
 	return fmt.Sprintf("%s/%s", vsref.Namespace, vsref.Name)
 }
 
@@ -106,36 +103,6 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 		return false, fmt.Errorf("error updating %s %q in controller cache: %v", className, objName, err)
 	}
 	return true, nil
-}
-
-// ConvertSnapshotStatus converts CSI snapshot status to crdv1.VolumeSnapshotStatus
-func ConvertSnapshotStatus(status *csi.SnapshotStatus, timestamp int64) crdv1.VolumeSnapshotStatus {
-	var snapDataStatus crdv1.VolumeSnapshotStatus
-
-	switch status.Type {
-	case csi.SnapshotStatus_READY:
-		timeCreated := metav1.Unix(0, timestamp)
-		timeNow := metav1.Now()
-		snapDataStatus = crdv1.VolumeSnapshotStatus{
-			CreatedAt:   &timeCreated,
-			AvailableAt: &timeNow,
-		}
-	case csi.SnapshotStatus_ERROR_UPLOADING:
-		err := storage.VolumeError{
-			Time:    metav1.Now(),
-			Message: status.Details,
-		}
-		snapDataStatus = crdv1.VolumeSnapshotStatus{
-			Error: &err,
-		}
-	case csi.SnapshotStatus_UPLOADING:
-		timeCreated := metav1.Unix(0, timestamp)
-		snapDataStatus = crdv1.VolumeSnapshotStatus{
-			CreatedAt: &timeCreated,
-		}
-	}
-
-	return snapDataStatus
 }
 
 // getSnapshotContentNameForSnapshot returns SnapshotData.Name for the create VolumeSnapshotContent.
