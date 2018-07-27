@@ -97,7 +97,7 @@ func main() {
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	crdClient, _, err := NewClient(config)
+	/*crdClient, _, err := NewClient(config)
 	if err != nil {
 		glog.Error(err.Error())
 		os.Exit(1)
@@ -108,7 +108,7 @@ func main() {
 	if err != nil {
 		glog.Error(err.Error())
 		os.Exit(1)
-	}
+	}*/
 
 	// Connect to CSI.
 	csiConn, err := connection.New(*csiAddress, *connectionTimeout)
