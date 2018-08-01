@@ -96,20 +96,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// make a new config for our extension's API group, using the first config as a baseline
-	/*crdClient, _, err := NewClient(config)
-	if err != nil {
-		glog.Error(err.Error())
-		os.Exit(1)
-	}
-
-	// wait until CRD gets processed
-	err = WaitForSnapshotResource(crdClient)
-	if err != nil {
-		glog.Error(err.Error())
-		os.Exit(1)
-	}*/
-
 	// Connect to CSI.
 	csiConn, err := connection.New(*csiAddress, *connectionTimeout)
 	if err != nil {
