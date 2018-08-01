@@ -27,13 +27,13 @@ import (
 	clientset "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
 	"github.com/kubernetes-csi/external-snapshotter/pkg/connection"
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
-	storage "k8s.io/api/storage/v1beta1"
-	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
+	ref "k8s.io/client-go/tools/reference"
 )
 
 // Handler is responsible for handling VolumeSnapshot events from informer.
@@ -120,26 +120,26 @@ func (handler *csiHandler) CheckandUpdateSnapshotStatusOperation(snapshot *crdv1
 	if err != nil {
 		return nil, fmt.Errorf("failed to check snapshot status %s with error %v", snapshot.Name, err)
 	}
-	
-	 newSnapshot, err := handler.UpdateSnapshotStatus(snapshot, status, time.Now())
-	 if err != nil {
-		 return nil, err
-	 } else {
-		 if newSnapshot.Status.AvailableAt != nil {
-			 // mark snapshot ready and bound
+
+	newSnapshot, err := handler.UpdateSnapshotStatus(snapshot, status, time.Now())
+	if err != nil {
+		return nil, err
+	} else {
+		if newSnapshot.Status.AvailableAt != nil {
+			// mark snapshot ready and bound
 			return handler.markSnapshotCompleted(newSnapshot)
-		 }
-	 }
-	 return newSnapshot, nil
+		}
+	}
+	return newSnapshot, nil
 }
 
 func (handler *csiHandler) markSnapshotCompleted(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error) {
 	metav1.SetMetaDataAnnotation(&snapshot.ObjectMeta, annBindCompleted, "yes")
-			updateSnapshot, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshot)
-		if err != nil {
-			return nil, err
-		}
-		return updateSnapshot, nil
+	updateSnapshot, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshot)
+	if err != nil {
+		return nil, err
+	}
+	return updateSnapshot, nil
 }
 
 // The function goes through the whole snapshot creation process.
@@ -171,13 +171,12 @@ func (handler *csiHandler) CreateSnapshotOperation(snapshot *crdv1.VolumeSnapsho
 	}
 	glog.Infof("Create snapshot driver %s, snapshotId %s, timestamp %v, csiSnapshotStatus %v", driverName, snapshotID, timestamp, csiSnapshotStatus)
 
-
 	// Update snapshot status with timestamp
 	newSnapshot, err := handler.UpdateSnapshotStatus(snapshot, csiSnapshotStatus, time.Unix(0, timestamp))
-	if err!= nil {
+	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create VolumeSnapshotContent in the database
 	contentName := GetSnapshotContentNameForSnapshot(snapshot)
 	volumeRef, err := ref.GetReference(scheme.Scheme, volume)
@@ -232,7 +231,7 @@ func (handler *csiHandler) CreateSnapshotOperation(snapshot *crdv1.VolumeSnapsho
 		glog.Error(strerr)
 		handler.eventRecorder.Event(newSnapshot, v1.EventTypeWarning, "CreateSnapshotContentFailed", strerr)
 		return nil, err
-	} 
+	}
 
 	// save succeeded, bind and update status for snapshot.
 	result, err := handler.BindandUpdateVolumeSnapshot(snapshotContent, newSnapshot)
@@ -327,8 +326,8 @@ func (handler *csiHandler) UpdateSnapshotStatus(snapshot *crdv1.VolumeSnapshot, 
 		}
 	case csi.SnapshotStatus_ERROR_UPLOADING:
 		if status.Error == nil {
-			status.Error =  &storage.VolumeError{
-				Time: *timeAt,
+			status.Error = &storage.VolumeError{
+				Time:    *timeAt,
 				Message: "Failed to upload the snapshot",
 			}
 			change = true
@@ -347,11 +346,10 @@ func (handler *csiHandler) UpdateSnapshotStatus(snapshot *crdv1.VolumeSnapshot, 
 		} else {
 			return newSnapshotObj, nil
 		}
-	} 
+	}
 	return snapshot, nil
 }
 
-	
 // getSimplifiedSnapshotStatus get status for snapshot.
 func (handler *csiHandler) GetSimplifiedSnapshotStatus(status *crdv1.VolumeSnapshotStatus) string {
 	if status == nil {

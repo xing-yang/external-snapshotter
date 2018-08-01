@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	clientset "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
 	storageinformers "github.com/kubernetes-csi/external-snapshotter/pkg/client/informers/externalversions/volumesnapshot/v1alpha1"
@@ -29,6 +28,7 @@ import (
 	"github.com/kubernetes-csi/external-snapshotter/pkg/connection"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -48,6 +48,7 @@ var (
 	statusUploading string = "uploading"
 	statusNew       string = "new"
 )
+
 const annBindCompleted = "snapshot.storage.kubernetes.io/bind-completed"
 
 type CSISnapshotController struct {
@@ -55,16 +56,16 @@ type CSISnapshotController struct {
 	client          kubernetes.Interface
 	snapshotterName string
 	eventRecorder   record.EventRecorder
-	snapshotQueue         workqueue.RateLimitingInterface
-	contentQueue        workqueue.RateLimitingInterface
+	snapshotQueue   workqueue.RateLimitingInterface
+	contentQueue    workqueue.RateLimitingInterface
 
-	snapshotLister        storagelisters.VolumeSnapshotLister
-	snapshotListerSynced  cache.InformerSynced
-	contentLister       storagelisters.VolumeSnapshotContentLister
-	contentListerSynced cache.InformerSynced
+	snapshotLister       storagelisters.VolumeSnapshotLister
+	snapshotListerSynced cache.InformerSynced
+	contentLister        storagelisters.VolumeSnapshotContentLister
+	contentListerSynced  cache.InformerSynced
 
-	snapshotStore  cache.Store
-	contentStore cache.Store
+	snapshotStore cache.Store
+	contentStore  cache.Store
 
 	handler Handler
 	// Map of scheduled/running operations.
@@ -103,10 +104,10 @@ func NewCSISnapshotController(
 		createSnapshotContentRetryCount: createSnapshotContentRetryCount,
 		createSnapshotContentInterval:   createSnapshotContentInterval,
 		resyncPeriod:                    resyncPeriod,
-		snapshotStore:                         cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
-		contentStore:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
-		snapshotQueue:                         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshotter-snapshot"),
-		contentQueue:                        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshotter-content"),
+		snapshotStore:                   cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
+		contentStore:                    cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
+		snapshotQueue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshotter-snapshot"),
+		contentQueue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshotter-content"),
 	}
 
 	volumeSnapshotInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -387,7 +388,7 @@ func (ctrl *CSISnapshotController) syncContent(content *crdv1.VolumeSnapshotCont
 		return fmt.Errorf("volumeSnapshotContent %s is not bound to any VolumeSnapshot", content.Name)
 	} else {
 		glog.V(4).Infof("synchronizing VolumeSnapshotContent[%s]: content is bound to vs %s", content.Name, snapshotRefKey(content.Spec.VolumeSnapshotRef))
-		// The VolumeSnapshotContent is reserved for a VolumeSNapshot; 
+		// The VolumeSnapshotContent is reserved for a VolumeSNapshot;
 		// that VolumeSnapshot has not yet been bound to this VolumeSnapshotCent; the VolumeSnapshot sync will handle it.
 		if content.Spec.VolumeSnapshotRef.UID == "" {
 			glog.V(4).Infof("synchronizing VolumeSnapshotContent[%s]: VolumeSnapshotContent is pre-bound to VolumeSnapshot", content.Name, snapshotRefKey(content.Spec.VolumeSnapshotRef))
@@ -471,7 +472,7 @@ func (ctrl *CSISnapshotController) syncSnapshot(snapshot *crdv1.VolumeSnapshot) 
 			}
 			return nil
 		}
-		
+
 	}
 }
 
