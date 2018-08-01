@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/golang/glog"
@@ -57,6 +58,8 @@ type csiHandler struct {
 	timeout                         time.Duration
 	createSnapshotContentRetryCount int
 	createSnapshotContentInterval   time.Duration
+	snapshotNamePrefix				string
+	snapshotNameUUIDLength			int
 }
 
 func NewCSIHandler(
@@ -68,6 +71,8 @@ func NewCSIHandler(
 	timeout time.Duration,
 	createSnapshotContentRetryCount int,
 	createSnapshotContentInterval time.Duration,
+	snapshotNamePrefix string,
+	snapshotNameUUIDLength int,
 ) Handler {
 	return &csiHandler{
 		clientset:       clientset,
@@ -78,6 +83,8 @@ func NewCSIHandler(
 		timeout:         timeout,
 		createSnapshotContentRetryCount: createSnapshotContentRetryCount,
 		createSnapshotContentInterval:   createSnapshotContentInterval,
+		snapshotNamePrefix: 	snapshotNamePrefix,
+		snapshotNameUUIDLength: snapshotNameUUIDLength,
 	}
 }
 
@@ -141,6 +148,23 @@ func (handler *csiHandler) markSnapshotCompleted(snapshot *crdv1.VolumeSnapshot)
 	return updateSnapshot, nil
 }
 
+
+func makeSnapshotName(prefix, snapshotUID string, snapshotNameUUIDLength int) (string, error) {
+	// create persistent name based on a volumeNamePrefix and volumeNameUUIDLength
+	// of PVC's UID
+	if len(prefix) == 0 {
+		return "", fmt.Errorf("Snapshot name prefix cannot be of length 0")
+	}
+	if len(snapshotUID) == 0 {
+		return "", fmt.Errorf("Corrupted snapshot object, it is missing UID")
+	}
+	if snapshotNameUUIDLength == -1 {
+		// Default behavior is to not truncate or remove dashes
+		return fmt.Sprintf("%s-%s", prefix, snapshotUID), nil
+	}
+	return fmt.Sprintf("%s-%s", prefix, strings.Replace(snapshotUID, "-", "", -1)[0:snapshotNameUUIDLength]), nil
+}
+
 // The function goes through the whole snapshot creation process.
 // 1. Trigger the snapshot through csi storage provider.
 // 2. Update VolumeSnapshot 'status with timestamp information
@@ -164,11 +188,15 @@ func (handler *csiHandler) CreateSnapshotOperation(snapshot *crdv1.VolumeSnapsho
 	ctx, cancel := context.WithTimeout(context.Background(), handler.timeout)
 	defer cancel()
 
-	driverName, snapshotID, timestamp, csiSnapshotStatus, err := handler.csiConnection.CreateSnapshot(ctx, snapshot, volume, class.Parameters)
+	snapshotName, err := makeSnapshotName(handler.snapshotNamePrefix, string(snapshot.UID), handler.snapshotNameUUIDLength)
+	if err != nil {
+		return nil, err
+	}
+	driverName, snapshotID, timestamp, csiSnapshotStatus, err := handler.csiConnection.CreateSnapshot(ctx, snapshotName, snapshot, volume, class.Parameters)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to take snapshot of the volume, %s: %q", volume.Name, err)
 	}
-	glog.Infof("Create snapshot driver %s, snapshotId %s, timestamp %v, csiSnapshotStatus %v", driverName, snapshotID, timestamp, csiSnapshotStatus)
+	glog.Infof("Create snapshot driver %s, snapshotId %s, timestamp %d, csiSnapshotStatus %v", driverName, snapshotID, timestamp, csiSnapshotStatus)
 
 	// Update snapshot status with timestamp
 	newSnapshot, err := handler.UpdateSnapshotStatus(snapshot, csiSnapshotStatus, time.Unix(0, timestamp))
@@ -308,7 +336,7 @@ func (handler *csiHandler) UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSnap
 
 // UpdateSnapshotStatus converts snapshot status to crdv1.VolumeSnapshotCondition
 func (handler *csiHandler) UpdateSnapshotStatus(snapshot *crdv1.VolumeSnapshot, csistatus *csi.SnapshotStatus, timestamp time.Time) (*crdv1.VolumeSnapshot, error) {
-	glog.V(4).Infof("updating VolumeSnapshot[]%s, set status %v", snapshotKey(snapshot), csistatus)
+	glog.V(4).Infof("updating VolumeSnapshot[]%s, set status %v, timestamp %v", snapshotKey(snapshot), csistatus, timestamp)
 	status := snapshot.Status
 	change := false
 	timeAt := &metav1.Time{
