@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	storage "k8s.io/api/storage/v1beta1"
 )
 
 const annSnapshotCompleted = "snapshot.storage.kubernetes.io/completed"
@@ -81,6 +82,8 @@ func NewCSISnapshotController(
 	conn connection.CSIConnection,
 	timeout time.Duration,
 	resyncPeriod time.Duration,
+	snapshotNamePrefix string,
+	snapshotNameUUIDLength int,
 ) *CSISnapshotController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
@@ -92,7 +95,7 @@ func NewCSISnapshotController(
 		client:                          client,
 		snapshotterName:                 snapshotterName,
 		eventRecorder:                   eventRecorder,
-		handler:                         NewCSIHandler(clientset, client, snapshotterName, eventRecorder, conn, timeout, createSnapshotContentRetryCount, createSnapshotContentInterval),
+		handler:                         NewCSIHandler(clientset, client, snapshotterName, eventRecorder, conn, timeout, createSnapshotContentRetryCount, createSnapshotContentInterval, snapshotNamePrefix, snapshotNameUUIDLength),
 		runningOperations:               goroutinemap.NewGoRoutineMap(true),
 		createSnapshotContentRetryCount: createSnapshotContentRetryCount,
 		createSnapshotContentInterval:   createSnapshotContentInterval,
@@ -380,14 +383,14 @@ func (ctrl *CSISnapshotController) syncContent(content *crdv1.VolumeSnapshotCont
 		glog.V(4).Infof("synchronizing VolumeSnapshotContent[%s]: VolumeSnapshotContent is not bound to any VolumeSnapshot", content.Name)
 		return fmt.Errorf("volumeSnapshotContent %s is not bound to any VolumeSnapshot", content.Name)
 	} else {
-		glog.V(4).Infof("synchronizing VolumeSnapshotContent[%s]: content is bound to vs %s", content.Name, snapshotRefKey(content.Spec.VolumeSnapshotRef))
+		glog.V(4).Infof("synchronizing VolumeSnapshotContent[%s]: content is bound to snapshot %s", content.Name, snapshotRefKey(content.Spec.VolumeSnapshotRef))
 		// The VolumeSnapshotContent is reserved for a VolumeSNapshot;
 		// that VolumeSnapshot has not yet been bound to this VolumeSnapshotCent; the VolumeSnapshot sync will handle it.
 		if content.Spec.VolumeSnapshotRef.UID == "" {
 			glog.V(4).Infof("synchronizing VolumeSnapshotContent[%s]: VolumeSnapshotContent is pre-bound to VolumeSnapshot", content.Name, snapshotRefKey(content.Spec.VolumeSnapshotRef))
 			return nil
 		}
-		// Get the VS by _name_
+		// Get the VolumeSnapshot by _name_
 		var vs *crdv1.VolumeSnapshot
 		vsName := snapshotRefKey(content.Spec.VolumeSnapshotRef)
 		obj, found, err := ctrl.snapshotStore.GetByKey(vsName)
@@ -426,7 +429,7 @@ func (ctrl *CSISnapshotController) syncContent(content *crdv1.VolumeSnapshotCont
 // For easier readability, it is split into syncCompleteSnapshot and syncUncompleteSnapshot
 func (ctrl *CSISnapshotController) syncSnapshot(snapshot *crdv1.VolumeSnapshot) error {
 	glog.V(4).Infof("synchonizing VolumeSnapshot[%s]: %s", snapshotKey(snapshot), getSnapshotStatusForLogging(snapshot))
-
+	
 	if !metav1.HasAnnotation(snapshot.ObjectMeta, annSnapshotCompleted) {
 		return ctrl.syncUncompleteSnapshot(snapshot)
 	} else {
@@ -456,8 +459,8 @@ func (ctrl *CSISnapshotController) syncCompleteSnapshot(snapshot *crdv1.VolumeSn
 			return fmt.Errorf("Cannot convert object from snapshot content store to VolumeSnapshotContent %q!?: %#v", snapshot.Spec.SnapshotContentName, obj)
 		}
 
-		glog.V(4).Infof("syncCompleteSnapshot[%s]: VolumeSnapshotContent %q found", snapshotKey(snapshot))
-		if content.Spec.VolumeSnapshotRef == nil || content.Spec.VolumeSnapshotRef.Name != snapshot.Name ||
+		glog.V(4).Infof("syncCompleteSnapshot[%s]: VolumeSnapshotContent %q found", snapshotKey(snapshot), content.Name)
+		if content.Spec.VolumeSnapshotRef == nil || content.Spec.VolumeSnapshotRef.Name != snapshot.Name || 
 			content.Spec.VolumeSnapshotRef.UID != snapshot.UID {
 			// snapshot is bound but content is not bound to snapshot correctly
 			if _, err = ctrl.updateSnapshotStatusWithEvent(snapshot, v1.EventTypeWarning, "SnapshotMisbound", "VolumeSnapshotContent is not bound to the VolumeSnapshot correctly"); err != nil {
@@ -701,7 +704,7 @@ func (ctrl *CSISnapshotController) updateSnapshotStatusWithEvent(snapshot *crdv1
 		return snapshot, nil
 	}
 	statusError := &storage.VolumeError{
-		Time: metav1.Time{
+		Time: metav1.Time {
 			Time: time.Now(),
 		},
 		Message: message,
@@ -710,7 +713,7 @@ func (ctrl *CSISnapshotController) updateSnapshotStatusWithEvent(snapshot *crdv1
 	snapshotClone := snapshot.DeepCopy()
 	snapshotClone.Status.Error = statusError
 	newSnapshot, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshotClone.Namespace).Update(snapshotClone)
-
+	
 	if err != nil {
 		glog.V(4).Infof("updating VolumeSnapshot[%s] error status failed %v", snapshotKey(snapshot), err)
 		return newSnapshot, err
