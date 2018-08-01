@@ -45,7 +45,6 @@ type Handler interface {
 	BindandUpdateVolumeSnapshot(snapshotContent *crdv1.VolumeSnapshotContent, snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error)
 	GetClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshotClass, error)
 	UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSnapshot, status *crdv1.VolumeSnapshotStatus) (*crdv1.VolumeSnapshot, error)
-	GetSimplifiedSnapshotStatus(status *crdv1.VolumeSnapshotStatus) string
 }
 
 // csiHandler is a handler that calls CSI to create/delete volume snapshot.
@@ -134,7 +133,7 @@ func (handler *csiHandler) CheckandUpdateSnapshotStatusOperation(snapshot *crdv1
 }
 
 func (handler *csiHandler) markSnapshotCompleted(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error) {
-	metav1.SetMetaDataAnnotation(&snapshot.ObjectMeta, annBindCompleted, "yes")
+	metav1.SetMetaDataAnnotation(&snapshot.ObjectMeta, annSnapshotCompleted, "yes")
 	updateSnapshot, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshot)
 	if err != nil {
 		return nil, err
@@ -309,11 +308,14 @@ func (handler *csiHandler) UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSnap
 
 // UpdateSnapshotStatus converts snapshot status to crdv1.VolumeSnapshotCondition
 func (handler *csiHandler) UpdateSnapshotStatus(snapshot *crdv1.VolumeSnapshot, csistatus *csi.SnapshotStatus, timestamp time.Time) (*crdv1.VolumeSnapshot, error) {
+	glog.V(4).Infof("updating VolumeSnapshot[]%s, set status %v", snapshotKey(snapshot), csistatus)
 	status := snapshot.Status
 	change := false
 	timeAt := &metav1.Time{
 		Time: timestamp,
 	}
+
+	snapshotClone := snapshot.DeepCopy()
 	switch csistatus.Type {
 	case csi.SnapshotStatus_READY:
 		if status.AvailableAt == nil {
@@ -339,8 +341,8 @@ func (handler *csiHandler) UpdateSnapshotStatus(snapshot *crdv1.VolumeSnapshot, 
 		}
 	}
 	if change {
-		snapshot.Status = status
-		newSnapshotObj, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshot)
+		snapshotClone.Status = status
+		newSnapshotObj, err := handler.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshotClone.Namespace).Update(snapshotClone)
 		if err != nil {
 			return nil, fmt.Errorf("error update status for volume snapshot %s: %s", snapshotKey(snapshot), err)
 		} else {
@@ -348,26 +350,6 @@ func (handler *csiHandler) UpdateSnapshotStatus(snapshot *crdv1.VolumeSnapshot, 
 		}
 	}
 	return snapshot, nil
-}
-
-// getSimplifiedSnapshotStatus get status for snapshot.
-func (handler *csiHandler) GetSimplifiedSnapshotStatus(status *crdv1.VolumeSnapshotStatus) string {
-	if status == nil {
-		glog.Errorf("No status for this snapshot yet.")
-		return statusNew
-	}
-
-	if status.Error != nil {
-		return statusError
-	}
-	if status.AvailableAt != nil {
-		return statusReady
-	}
-	if status.CreatedAt != nil {
-		return statusUploading
-	}
-
-	return statusNew
 }
 
 // getVolumeFromVolumeSnapshot is a helper function to get PV from VolumeSnapshot.
