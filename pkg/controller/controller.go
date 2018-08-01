@@ -39,17 +39,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	storage "k8s.io/api/storage/v1beta1"
 )
 
-var (
-	// Statuses of snapshot creation process
-	statusReady     string = "ready"
-	statusError     string = "error"
-	statusUploading string = "uploading"
-	statusNew       string = "new"
-)
-
-const annBindCompleted = "snapshot.storage.kubernetes.io/bind-completed"
+const annSnapshotCompleted = "snapshot.storage.kubernetes.io/completed"
 
 type CSISnapshotController struct {
 	clientset       clientset.Interface
@@ -426,12 +419,63 @@ func (ctrl *CSISnapshotController) syncContent(content *crdv1.VolumeSnapshotCont
 	return nil
 }
 
-// syncSnapshot deals with one key off the queue.  It returns false when it's time to quit.
+// syncSnapshot is the main controller method to decide what to do with a snapshot.
+// It's invoked by appropriate cache.Controller callbacks when a snapshot is
+// created, updated or periodically synced. We do not differentiate between
+// these events.
+// For easier readability, it is split into syncCompleteSnapshot and syncUncompleteSnapshot
 func (ctrl *CSISnapshotController) syncSnapshot(snapshot *crdv1.VolumeSnapshot) error {
+	glog.V(4).Infof("synchonizing VolumeSnapshot[%s]: %s", snapshotKey(snapshot), getSnapshotStatusForLogging(snapshot))
+	
+	if !metav1.HasAnnotation(snapshot.ObjectMeta, annSnapshotCompleted) {
+		return ctrl.syncUncompleteSnapshot(snapshot)
+	} else {
+		return ctrl.syncCompleteSnapshot(snapshot)
+	}
+}
+
+func (ctrl *CSISnapshotController) syncCompleteSnapshot(snapshot *crdv1.VolumeSnapshot) error {
+	if snapshot.Spec.SnapshotContentName == "" {
+		if _, err := ctrl.updateSnapshotStatusWithEvent(snapshot, v1.EventTypeWarning, "SnapshotLost", "Bound snapshot has lost reference to VolumeSnapshotContent"); err != nil {
+			return err
+		}
+		return nil
+	}
+	obj, found, err := ctrl.contentStore.GetByKey(snapshot.Spec.SnapshotContentName)
+	if err != nil {
+		return err
+	}
+	if !found {
+		if _, err = ctrl.updateSnapshotStatusWithEvent(snapshot, v1.EventTypeWarning, "SnapshotLost", "Bound snapshot has lost reference to VolumeSnapshotContent"); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		content, ok := obj.(*crdv1.VolumeSnapshotContent)
+		if !ok {
+			return fmt.Errorf("Cannot convert object from snapshot content store to VolumeSnapshotContent %q!?: %#v", snapshot.Spec.SnapshotContentName, obj)
+		}
+
+		glog.V(4).Infof("syncCompleteSnapshot[%s]: VolumeSnapshotContent %q found", snapshotKey(snapshot))
+		if content.Spec.VolumeSnapshotRef == nil || content.Spec.VolumeSnapshotRef.Name != snapshot.Name || 
+			content.Spec.VolumeSnapshotRef.UID != snapshot.UID {
+			// snapshot is bound but content is not bound to snapshot correctly
+			if _, err = ctrl.updateSnapshotStatusWithEvent(snapshot, v1.EventTypeWarning, "SnapshotMisbound", "VolumeSnapshotContent is not bound to the VolumeSnapshot correctly"); err != nil {
+				return err
+			}
+			return nil
+		}
+		// Snapshot is correctly bound.
+		return nil
+	}
+}
+
+func (ctrl *CSISnapshotController) syncUncompleteSnapshot(snapshot *crdv1.VolumeSnapshot) error {
 	uniqueSnapshotName := snapshotKey(snapshot)
 	glog.V(4).Infof("syncSnapshot %s", uniqueSnapshotName)
 
-	if metav1.HasAnnotation(snapshot.ObjectMeta, annBindCompleted) || snapshot.Status.Error != nil {
+	// Snsapshot has errors before its completion. Controller will not try to fix it. Nothing to do.
+	if snapshot.Status.Error != nil {
 		return nil
 	}
 
@@ -641,4 +685,51 @@ func (ctrl *CSISnapshotController) checkandUpdateSnapshotStatus(snapshot *crdv1.
 		return nil
 	})
 	return nil
+}
+
+
+// updateSnapshotStatusWithEvent saves new snapshot.Status to API server and emits
+// given event on the snapshot. It saves the status and emits the event only when
+// the status has actually changed from the version saved in API server.
+// Parameters:
+//   snapshot - snapshot to update
+//   eventtype, reason, message - event to send, see EventRecorder.Event()
+func (ctrl *CSISnapshotController) updateSnapshotStatusWithEvent(snapshot *crdv1.VolumeSnapshot, eventtype, reason, message string) (*crdv1.VolumeSnapshot, error) {
+	glog.V(4).Infof("updateSnapshotStatusWithEvent[%s]", snapshotKey(snapshot))
+	if snapshot.Status.Error != nil {
+		// Nothing to do.
+		glog.V(4).Infof("updateClaimStatusWithEvent[%s]: error %v already set", snapshot.Status.Error)
+		return snapshot, nil
+	}
+	statusError := &storage.VolumeError{
+		Time: metav1.Time {
+			Time: time.Now(),
+		},
+		Message: message,
+	}
+
+	snapshotClone := snapshot.DeepCopy()
+	snapshotClone.Status.Error = statusError
+	newSnapshot, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshotClone.Namespace).Update(snapshotClone)
+	
+	if err != nil {
+		glog.V(4).Infof("updating VolumeSnapshot[%s] error status failed %v", snapshotKey(snapshot), err)
+		return newSnapshot, err
+	}
+
+	_, err = ctrl.storeSnapshotUpdate(newSnapshot)
+	if err != nil {
+		glog.V(4).Infof("updating VolumeSnapshot[%s] error status: cannot update internal cache %v", snapshotKey(snapshot), err)
+		return newSnapshot, err
+	}
+	// Emit the event only when the status change happens
+	ctrl.eventRecorder.Event(newSnapshot, eventtype, reason, message)
+
+	return newSnapshot, nil
+}
+
+// Stateless functions
+func getSnapshotStatusForLogging(snapshot *crdv1.VolumeSnapshot) string {
+	complete := metav1.HasAnnotation(snapshot.ObjectMeta, annSnapshotCompleted)
+	return fmt.Sprintf("bound to: %q, Completed: %v", snapshot.Spec.SnapshotContentName, complete)
 }
