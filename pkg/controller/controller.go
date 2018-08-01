@@ -27,6 +27,7 @@ import (
 	storagelisters "github.com/kubernetes-csi/external-snapshotter/pkg/client/listers/volumesnapshot/v1alpha1"
 	"github.com/kubernetes-csi/external-snapshotter/pkg/connection"
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	storage "k8s.io/api/storage/v1beta1"
 )
 
 const annSnapshotCompleted = "snapshot.storage.kubernetes.io/completed"
@@ -426,7 +426,7 @@ func (ctrl *CSISnapshotController) syncContent(content *crdv1.VolumeSnapshotCont
 // For easier readability, it is split into syncCompleteSnapshot and syncUncompleteSnapshot
 func (ctrl *CSISnapshotController) syncSnapshot(snapshot *crdv1.VolumeSnapshot) error {
 	glog.V(4).Infof("synchonizing VolumeSnapshot[%s]: %s", snapshotKey(snapshot), getSnapshotStatusForLogging(snapshot))
-	
+
 	if !metav1.HasAnnotation(snapshot.ObjectMeta, annSnapshotCompleted) {
 		return ctrl.syncUncompleteSnapshot(snapshot)
 	} else {
@@ -457,7 +457,7 @@ func (ctrl *CSISnapshotController) syncCompleteSnapshot(snapshot *crdv1.VolumeSn
 		}
 
 		glog.V(4).Infof("syncCompleteSnapshot[%s]: VolumeSnapshotContent %q found", snapshotKey(snapshot))
-		if content.Spec.VolumeSnapshotRef == nil || content.Spec.VolumeSnapshotRef.Name != snapshot.Name || 
+		if content.Spec.VolumeSnapshotRef == nil || content.Spec.VolumeSnapshotRef.Name != snapshot.Name ||
 			content.Spec.VolumeSnapshotRef.UID != snapshot.UID {
 			// snapshot is bound but content is not bound to snapshot correctly
 			if _, err = ctrl.updateSnapshotStatusWithEvent(snapshot, v1.EventTypeWarning, "SnapshotMisbound", "VolumeSnapshotContent is not bound to the VolumeSnapshot correctly"); err != nil {
@@ -687,7 +687,6 @@ func (ctrl *CSISnapshotController) checkandUpdateSnapshotStatus(snapshot *crdv1.
 	return nil
 }
 
-
 // updateSnapshotStatusWithEvent saves new snapshot.Status to API server and emits
 // given event on the snapshot. It saves the status and emits the event only when
 // the status has actually changed from the version saved in API server.
@@ -702,7 +701,7 @@ func (ctrl *CSISnapshotController) updateSnapshotStatusWithEvent(snapshot *crdv1
 		return snapshot, nil
 	}
 	statusError := &storage.VolumeError{
-		Time: metav1.Time {
+		Time: metav1.Time{
 			Time: time.Now(),
 		},
 		Message: message,
@@ -711,7 +710,7 @@ func (ctrl *CSISnapshotController) updateSnapshotStatusWithEvent(snapshot *crdv1
 	snapshotClone := snapshot.DeepCopy()
 	snapshotClone.Status.Error = statusError
 	newSnapshot, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshots(snapshotClone.Namespace).Update(snapshotClone)
-	
+
 	if err != nil {
 		glog.V(4).Infof("updating VolumeSnapshot[%s] error status failed %v", snapshotKey(snapshot), err)
 		return newSnapshot, err
