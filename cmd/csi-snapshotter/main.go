@@ -55,8 +55,8 @@ var (
 	createSnapshotContentRetryCount = flag.Int("createSnapshotContentRetryCount", 5, "Number of retries when we create a snapshot data object for a snapshot.")
 	createSnapshotContentInterval   = flag.Duration("createSnapshotContentInterval", 10*time.Second, "Interval between retries when we create a snapshot data object for a snapshot.")
 	resyncPeriod                    = flag.Duration("resyncPeriod", 60*time.Second, "The period that should be used to re-sync the snapshot.")
-	snapshotNamePrefix 				= flag.String("snapshot-name-prefix", "snapshot", "Prefix to apply to the name of a created snapshot")
-	snapshotNameUUIDLength 			= flag.Int("snapshot-name-uuid-length", -1, "Length in characters for the generated uuid of a created snapshot")
+	snapshotNamePrefix              = flag.String("snapshot-name-prefix", "snapshot", "Prefix to apply to the name of a created snapshot")
+	snapshotNameUUIDLength          = flag.Int("snapshot-name-uuid-length", -1, "Length in characters for the generated uuid of a created snapshot")
 )
 
 func main() {

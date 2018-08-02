@@ -19,8 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/golang/glog"
@@ -58,8 +58,8 @@ type csiHandler struct {
 	timeout                         time.Duration
 	createSnapshotContentRetryCount int
 	createSnapshotContentInterval   time.Duration
-	snapshotNamePrefix				string
-	snapshotNameUUIDLength			int
+	snapshotNamePrefix              string
+	snapshotNameUUIDLength          int
 }
 
 func NewCSIHandler(
@@ -83,8 +83,8 @@ func NewCSIHandler(
 		timeout:         timeout,
 		createSnapshotContentRetryCount: createSnapshotContentRetryCount,
 		createSnapshotContentInterval:   createSnapshotContentInterval,
-		snapshotNamePrefix: 	snapshotNamePrefix,
-		snapshotNameUUIDLength: snapshotNameUUIDLength,
+		snapshotNamePrefix:              snapshotNamePrefix,
+		snapshotNameUUIDLength:          snapshotNameUUIDLength,
 	}
 }
 
@@ -147,7 +147,6 @@ func (handler *csiHandler) markSnapshotCompleted(snapshot *crdv1.VolumeSnapshot)
 	}
 	return updateSnapshot, nil
 }
-
 
 func makeSnapshotName(prefix, snapshotUID string, snapshotNameUUIDLength int) (string, error) {
 	// create persistent name based on a volumeNamePrefix and volumeNameUUIDLength
