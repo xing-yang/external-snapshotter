@@ -300,10 +300,6 @@ func (in *VolumeSnapshotStatus) DeepCopyInto(out *VolumeSnapshotStatus) {
 		in, out := &in.CreatedAt, &out.CreatedAt
 		*out = (*in).DeepCopy()
 	}
-	if in.AvailableAt != nil {
-		in, out := &in.AvailableAt, &out.AvailableAt
-		*out = (*in).DeepCopy()
-	}
 	if in.Error != nil {
 		in, out := &in.Error, &out.Error
 		*out = new(v1beta1.VolumeError)

@@ -38,18 +38,12 @@ type VolumeSnapshotStatus struct {
 	// +optional
 	CreatedAt *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 
-	// AvailableAt is the time the snapshot was successfully created and available
-	// for use. A snapshot MUST have already been created before it can be available.
-	// If a snapshot was available, it indicates the snapshot was created.
-	// When the snapshot was created but not available yet, the application can be
-	// resumed if it was previously frozen before taking the snapshot. In this case,
-	// it is possible that the snapshot is being uploaded to the cloud. For example,
-	// both GCE and AWS support uploading of the snapshot after it is cut as part of
-	// the Create Snapshot process.
-	// If the timestamp AvailableAt is set, it means the snapshot was available;
-	// Otherwise the snapshot was not available.
+	// Bound is set to true only if the snapshot is ready to use (e.g., finish uploading if
+	// there is an uploading phase) and also VolumeSnapshot and its VolumeSnapshotContent
+	// bind correctly with each other. If any of the above condition is not true, Bound is
+	// set to false
 	// +optional
-	AvailableAt *metav1.Time `json:"availableAt" protobuf:"bytes,2,opt,name=availableAt"`
+	Bound bool `json:"bound" protobuf:"varint,2,opt,name=bound"`
 
 	// The last error encountered during create snapshot operation, if any.
 	// This field must only be set by the entity completing the create snapshot
@@ -61,7 +55,8 @@ type VolumeSnapshotStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// VolumeSnapshot is the volume snapshot object accessible to the user. Upon successful creation of the actual
+// VolumeSnapshot is the volume snapshot object accessible to the user. VolumeSnapshot can specify which volume
+// will be used to take the snapshot by setting PersistentVolumeClaim name. Upon successful creation of the actual
 // snapshot by the volume provider it is bound to the corresponding VolumeSnapshotContent through
 // the VolumeSnapshotSpec
 type VolumeSnapshot struct {
@@ -74,7 +69,7 @@ type VolumeSnapshot struct {
 	// Spec represents the desired state of the snapshot
 	Spec VolumeSnapshotSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status represents the latest observer state of the snapshot
+	// Status represents the latest observed state of the snapshot
 	// +optional
 	Status VolumeSnapshotStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -93,7 +88,8 @@ type VolumeSnapshotList struct {
 
 // VolumeSnapshotSpec is the desired state of the volume snapshot
 type VolumeSnapshotSpec struct {
-	// PersistentVolumeClaimName is the name of the PVC being snapshotted
+	// PersistentVolumeClaimName is the name of the PVC being snapshotted.
+	// If not specified, user can create VolumeSnapshotContent and bind it with VolumeSnapshot manually.
 	// +optional
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName" protobuf:"bytes,1,opt,name=persistentVolumeClaimName"`
 
@@ -101,7 +97,8 @@ type VolumeSnapshotSpec struct {
 	// +optional
 	SnapshotContentName string `json:"snapshotContentName" protobuf:"bytes,2,opt,name=snapshotContentName"`
 
-	// Name of the VolumeSnapshotClass required by the volume snapshot.
+	// Name of the VolumeSnapshotClass used by the VolumeSnapshot. If not specified, a default snapshot class will
+	// be used if it is available.
 	// +optional
 	VolumeSnapshotClassName string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
 }
