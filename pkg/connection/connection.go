@@ -189,7 +189,6 @@ func (c *csiConnection) SupportsControllerListSnapshots(ctx context.Context) (bo
 	return false, nil
 }
 
-
 func (c *csiConnection) CreateSnapshot(ctx context.Context, snapshotName string, snapshot *crdv1.VolumeSnapshot, volume *v1.PersistentVolume, parameters map[string]string) (string, string, int64, *csi.SnapshotStatus, error) {
 	glog.V(5).Infof("CSI CreateSnapshot: %s", snapshot.Name)
 	if volume.Spec.CSI == nil {
