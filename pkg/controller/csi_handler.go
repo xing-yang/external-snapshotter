@@ -37,6 +37,9 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 )
 
+
+const pvcKind = "PersistentVolumeClaim"
+
 // Handler is responsible for handling VolumeSnapshot events from informer.
 type Handler interface {
 	CreateSnapshotOperation(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error)
@@ -378,7 +381,10 @@ func (handler *csiHandler) GetClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnap
 
 // getClaimFromVolumeSnapshot is a helper function to get PV from VolumeSnapshot.
 func (handler *csiHandler) getClaimFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*v1.PersistentVolumeClaim, error) {
-	pvcName := snapshot.Spec.PersistentVolumeClaimName
+	if snapshot.Spec.Source == nil || snapshot.Spec.Source.Kind != pvcKind {
+		return nil, fmt.Errorf("The snapshot source is not the right type. Expected %s, Got %s", pvcKind, snapshot.Spec.Source.Kind)
+	}
+	pvcName := snapshot.Spec.Source.Name
 	if pvcName == "" {
 		return nil, fmt.Errorf("the PVC name is not specified in snapshot %s", snapshotKey(snapshot))
 	}

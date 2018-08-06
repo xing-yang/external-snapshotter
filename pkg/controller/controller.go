@@ -523,6 +523,7 @@ func (ctrl *CSISnapshotController) syncUnboundSnapshot(snapshot *crdv1.VolumeSna
 			return nil
 		} else {
 			if err := ctrl.createSnapshot(snapshot); err != nil {
+				ctrl.updateSnapshotErrorStatusWithEvent(snapshot, v1.EventTypeWarning, "SnapshotCreationFailed", fmt.Sprintf("Failed to create snapshot with error %v", err))
 				return err
 			}
 			return nil
@@ -707,8 +708,7 @@ func (ctrl *CSISnapshotController) checkandUpdateSnapshotStatus(snapshot *crdv1.
 func (ctrl *CSISnapshotController) updateSnapshotErrorStatusWithEvent(snapshot *crdv1.VolumeSnapshot, eventtype, reason, message string) (*crdv1.VolumeSnapshot, error) {
 	glog.V(4).Infof("updateSnapshotStatusWithEvent[%s]", snapshotKey(snapshot))
 
-	// Emit the event only when the status change happens
-	ctrl.eventRecorder.Event(snapshot, eventtype, reason, message)
+	
 
 	if snapshot.Status.Error != nil && snapshot.Status.Bound == false {
 		glog.V(4).Infof("updateClaimStatusWithEvent[%s]: error %v already set", snapshot.Status.Error)
@@ -737,7 +737,7 @@ func (ctrl *CSISnapshotController) updateSnapshotErrorStatusWithEvent(snapshot *
 		return newSnapshot, err
 	}
 	// Emit the event only when the status change happens
-	ctrl.eventRecorder.Event(snapshot, eventtype, reason, message)
+	ctrl.eventRecorder.Event(newSnapshot, eventtype, reason, message)
 
 	return newSnapshot, nil
 }
@@ -792,10 +792,11 @@ func (ctrl *CSISnapshotController) BindSnapshotContent(snapshot *crdv1.VolumeSna
 	} else if content.Spec.VolumeSnapshotRef.UID != "" && content.Spec.VolumeSnapshotRef.UID != snapshot.UID {
 		return fmt.Errorf("Could not bind snapshot %s and content %s, the VolumeSnapshotRef does not match", snapshot.Name, content.Name)
 	} else if content.Spec.VolumeSnapshotRef.UID == "" {
-		content.Spec.VolumeSnapshotRef.UID = snapshot.UID
-		newContent, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshotContents().Update(content)
+		contentClone := content.DeepCopy()
+		contentClone.Spec.VolumeSnapshotRef.UID = snapshot.UID
+		newContent, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshotContents().Update(contentClone)
 		if err != nil {
-			glog.V(4).Infof("updating VolumeSnapshotContent[%s] error status failed %v", content.Name, err)
+			glog.V(4).Infof("updating VolumeSnapshotContent[%s] error status failed %v", newContent.Name, err)
 			return err
 		}
 		_, err = ctrl.storeContentUpdate(newContent)
