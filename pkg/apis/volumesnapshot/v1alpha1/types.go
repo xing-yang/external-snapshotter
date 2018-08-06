@@ -88,10 +88,11 @@ type VolumeSnapshotList struct {
 
 // VolumeSnapshotSpec is the desired state of the volume snapshot
 type VolumeSnapshotSpec struct {
-	// PersistentVolumeClaimName is the name of the PVC being snapshotted.
+	// Source has the information about where the snapshot is created from.
+	// In Alpha version, only PersistentVolumeClaim is supported as the source.
 	// If not specified, user can create VolumeSnapshotContent and bind it with VolumeSnapshot manually.
 	// +optional
-	PersistentVolumeClaimName string `json:"persistentVolumeClaimName" protobuf:"bytes,1,opt,name=persistentVolumeClaimName"`
+	Source *TypedLocalObjectReference `json:"source" protobuf:"bytes,1,opt,name=source"`
 
 	// SnapshotContentName binds the VolumeSnapshot object with the VolumeSnapshotContent
 	// +optional
@@ -101,6 +102,17 @@ type VolumeSnapshotSpec struct {
 	// be used if it is available.
 	// +optional
 	VolumeSnapshotClassName string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
+// TODO: After TypedLocalObjectReference is merged into the in-tree core API, this will be replaced.
+type TypedLocalObjectReference struct {
+	// Name of the referent.
+	// +optional
+	Name string
+	// Kind of the referent.
+	// +optional
+	Kind string
 }
 
 // +genclient
