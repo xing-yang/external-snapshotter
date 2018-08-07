@@ -31,34 +31,12 @@ const (
 	VolumeSnapshotClassResourcePlural = "volumesnapshotclasses"
 )
 
-// VolumeSnapshotStatus is the status of the VolumeSnapshot
-type VolumeSnapshotStatus struct {
-	// CreatedAt is the time the snapshot was successfully created. If it is set,
-	// it means the snapshot was created; Otherwise the snapshot was not created.
-	// +optional
-	CreatedAt *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
-
-	// Bound is set to true only if the snapshot is ready to use (e.g., finish uploading if
-	// there is an uploading phase) and also VolumeSnapshot and its VolumeSnapshotContent
-	// bind correctly with each other. If any of the above condition is not true, Bound is
-	// set to false
-	// +optional
-	Bound bool `json:"bound" protobuf:"varint,2,opt,name=bound"`
-
-	// The last error encountered during create snapshot operation, if any.
-	// This field must only be set by the entity completing the create snapshot
-	// operation, i.e. the external-snapshotter.
-	// +optional
-	Error *storage.VolumeError
-}
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// VolumeSnapshot is the volume snapshot object accessible to the user. VolumeSnapshot can specify which volume
-// will be used to take the snapshot by setting PersistentVolumeClaim name. Upon successful creation of the actual
-// snapshot by the volume provider it is bound to the corresponding VolumeSnapshotContent through
-// the VolumeSnapshotSpec
+// VolumeSnapshot is a user's request for taking a snapshot. Upon successful creation of the actual
+// snapshot by the volume provider it is bound to the corresponding VolumeSnapshotContent.
+// Only the VolumeSnapshot object is accessible to the user in the namespace.
 type VolumeSnapshot struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -66,7 +44,7 @@ type VolumeSnapshot struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec represents the desired state of the snapshot
+	// Spec defines the desired characteristics of a snapshot requested by a user.
 	Spec VolumeSnapshotSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status represents the latest observed state of the snapshot
@@ -86,7 +64,7 @@ type VolumeSnapshotList struct {
 	Items []VolumeSnapshot `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// VolumeSnapshotSpec is the desired state of the volume snapshot
+// VolumeSnapshotSpec describes the common attributes of a volume snapshot
 type VolumeSnapshotSpec struct {
 	// Source has the information about where the snapshot is created from.
 	// In Alpha version, only PersistentVolumeClaim is supported as the source.
@@ -102,6 +80,27 @@ type VolumeSnapshotSpec struct {
 	// be used if it is available.
 	// +optional
 	VolumeSnapshotClassName string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
+}
+
+// VolumeSnapshotStatus is the status of the VolumeSnapshot
+type VolumeSnapshotStatus struct {
+	// CreationTime is the time the snapshot was successfully created. If it is set,
+	// it means the snapshot was created; Otherwise the snapshot was not created.
+	// +optional
+	CreationTime *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
+
+	// Ready is set to true only if the snapshot is ready to use (e.g., finish uploading if
+	// there is an uploading phase) and also VolumeSnapshot and its VolumeSnapshotContent
+	// bind correctly with each other. If any of the above condition is not true, Ready is
+	// set to false
+	// +optional
+	Ready bool `json:"ready" protobuf:"varint,2,opt,name=ready"`
+
+	// The last error encountered during create snapshot operation, if any.
+	// This field must only be set by the entity completing the create snapshot
+	// operation, i.e. the external-snapshotter.
+	// +optional
+	Error *storage.VolumeError
 }
 
 // TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
@@ -121,9 +120,8 @@ type TypedLocalObjectReference struct {
 
 // VolumeSnapshotClass describes the parameters used by storage system when
 // provisioning VolumeSnapshots from PVCs.
-//
-// VolumeSnapshotClasses are non-namespaced; the name of the snapshot class
-// according to etcd is in ObjectMeta.Name.
+// The name of a VolumeSnapshotClass object is significant, and is how users can request a particular class.
+
 type VolumeSnapshotClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
