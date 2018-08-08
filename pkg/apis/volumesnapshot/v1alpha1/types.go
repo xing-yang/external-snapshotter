@@ -121,7 +121,6 @@ type TypedLocalObjectReference struct {
 // VolumeSnapshotClass describes the parameters used by storage system when
 // provisioning VolumeSnapshots from PVCs.
 // The name of a VolumeSnapshotClass object is significant, and is how users can request a particular class.
-
 type VolumeSnapshotClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
