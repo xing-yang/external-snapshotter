@@ -134,6 +134,7 @@ func main() {
 		*snapshotter,
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshots(),
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshotContents(),
+		factory.Volumesnapshot().V1alpha1().VolumeSnapshotClasses(),
 		*createSnapshotContentRetryCount,
 		*createSnapshotContentInterval,
 		csiConn,

@@ -31,6 +31,7 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // ==================================================================
@@ -73,6 +74,8 @@ import (
 // In the future version, a retry policy will be added.
 
 const pvcKind = "PersistentVolumeClaim"
+
+const IsDefaultSnapshotClassAnnotation = "snapshot.storage.kubernetes.io/is-default-class"
 
 // syncContent deals with one key off the queue.  It returns false when it's time to quit.
 func (ctrl *CSISnapshotController) syncContent(content *crdv1.VolumeSnapshotContent) error {
@@ -674,12 +677,48 @@ func (ctrl *CSISnapshotController) getVolumeFromVolumeSnapshot(snapshot *crdv1.V
 func (ctrl *CSISnapshotController) GetClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshotClass, error) {
 	className := snapshot.Spec.VolumeSnapshotClassName
 	glog.V(5).Infof("getClassFromVolumeSnapshot [%s]: VolumeSnapshotClassName [%s]", snapshot.Name, className)
-	class, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshotClasses().Get(className, metav1.GetOptions{})
-	if err != nil {
-		glog.Errorf("failed to retrieve storage class %s from the API server: %q", className, err)
-		//return nil, fmt.Errorf("failed to retrieve storage class %s from the API server: %q", className, err)
+	if len(className) > 0 {
+		class, err := ctrl.clientset.VolumesnapshotV1alpha1().VolumeSnapshotClasses().Get(className, metav1.GetOptions{})
+		if err != nil {
+			glog.Errorf("failed to retrieve storage class %s from the API server: %q", className, err)
+			//return nil, fmt.Errorf("failed to retrieve storage class %s from the API server: %q", className, err)
+		}
+		glog.V(5).Infof("getClassFromVolumeSnapshot [%s]: VolumeSnapshotClassName [%s]", snapshot.Name, className)
+		return class, nil
+	} else {
+		// Find default snapshot class if available
+		list, err := ctrl.classLister.List(labels.Everything())
+        if err != nil {
+                return nil, err
+        }
+		pvc, err := ctrl.getClaimFromVolumeSnapshot(snapshot)
+		if err != nil {
+			return nil, err
+		}
+		storageclass, err := ctrl.client.StorageV1().StorageClasses().Get(*pvc.Spec.StorageClassName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		defaultClasses := []*crdv1.VolumeSnapshotClass{}
+		
+        for _, class := range list {
+                if IsDefaultAnnotation(class.ObjectMeta) && storageclass.Provisioner == class.Snapshotter {
+                        defaultClasses = append(defaultClasses, class)
+                        glog.V(4).Infof("getDefaultClass added: %s", class.Name)
+                }
+        }
+
+        if len(defaultClasses) == 0 {
+                return nil, nil
+        }
+        if len(defaultClasses) > 1 {
+                glog.V(4).Infof("getDefaultClass %d defaults found", len(defaultClasses))
+                return nil, fmt.Errorf("%d default StorageClasses were found", len(defaultClasses))
+		}
+		glog.V(5).Infof("getClassFromVolumeSnapshot [%s]: default VolumeSnapshotClassName [%s]", snapshot.Name, defaultClasses[0])
+        return defaultClasses[0], nil
+
 	}
-	return class, nil
 }
 
 // getClaimFromVolumeSnapshot is a helper function to get PV from VolumeSnapshot.

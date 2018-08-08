@@ -51,6 +51,8 @@ type CSISnapshotController struct {
 	snapshotListerSynced cache.InformerSynced
 	contentLister        storagelisters.VolumeSnapshotContentLister
 	contentListerSynced  cache.InformerSynced
+	classLister			 storagelisters.VolumeSnapshotClassLister
+	classListerSynced	 cache.InformerSynced
 
 	snapshotStore cache.Store
 	contentStore  cache.Store
@@ -71,6 +73,7 @@ func NewCSISnapshotController(
 	snapshotterName string,
 	volumeSnapshotInformer storageinformers.VolumeSnapshotInformer,
 	volumeSnapshotContentInformer storageinformers.VolumeSnapshotContentInformer,
+	volumeSnapshotClassInformer storageinformers.VolumeSnapshotClassInformer,
 	createSnapshotContentRetryCount int,
 	createSnapshotContentInterval time.Duration,
 	conn connection.CSIConnection,
@@ -121,6 +124,9 @@ func NewCSISnapshotController(
 	)
 	ctrl.contentLister = volumeSnapshotContentInformer.Lister()
 	ctrl.contentListerSynced = volumeSnapshotContentInformer.Informer().HasSynced
+
+	ctrl.classLister = volumeSnapshotClassInformer.Lister()
+	ctrl.classListerSynced = volumeSnapshotClassInformer.Informer().HasSynced
 
 	return ctrl
 }

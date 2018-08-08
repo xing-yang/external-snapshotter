@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
@@ -109,4 +110,15 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 // The name must be unique.
 func GetSnapshotContentNameForSnapshot(snapshot *crdv1.VolumeSnapshot) string {
 	return "snapdata-" + string(snapshot.UID)
+}
+
+
+// IsDefaultAnnotation returns a boolean if
+// the annotation is set
+func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
+	if obj.Annotations[IsDefaultSnapshotClassAnnotation] == "true" {
+		return true
+	}
+
+	return false
 }
