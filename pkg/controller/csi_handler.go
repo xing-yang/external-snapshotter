@@ -28,23 +28,19 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-
 // Handler is responsible for handling VolumeSnapshot events from informer.
 type Handler interface {
-	CreateSnapshot(snapshot *crdv1.VolumeSnapshot, volume *v1.PersistentVolume, parameters map[string]string)  (string, string, int64, *csi.SnapshotStatus, error) 
-	//CheckandUpdateSnapshotStatusOperation(snapshot *crdv1.VolumeSnapshot, content *crdv1.VolumeSnapshotContent) (*crdv1.VolumeSnapshot, error)
+	CreateSnapshot(snapshot *crdv1.VolumeSnapshot, volume *v1.PersistentVolume, parameters map[string]string) (string, string, int64, *csi.SnapshotStatus, error)
 	DeleteSnapshot(content *crdv1.VolumeSnapshotContent) error
 	GetSnapshotStatus(content *crdv1.VolumeSnapshotContent) (*csi.SnapshotStatus, int64, error)
-	//BindandUpdateVolumeSnapshot(snapshotContent *crdv1.VolumeSnapshotContent, snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error)
-	//GetClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshotClass, error)
 }
 
 // csiHandler is a handler that calls CSI to create/delete volume snapshot.
 type csiHandler struct {
-	csiConnection           connection.CSIConnection
-	timeout                 time.Duration
-	snapshotNamePrefix 		string
-	snapshotNameUUIDLength 	int
+	csiConnection          connection.CSIConnection
+	timeout                time.Duration
+	snapshotNamePrefix     string
+	snapshotNameUUIDLength int
 }
 
 func NewCSIHandler(
@@ -54,15 +50,14 @@ func NewCSIHandler(
 	snapshotNameUUIDLength int,
 ) Handler {
 	return &csiHandler{
-		csiConnection:   		csiConnection,
-		timeout:         		timeout,
-		snapshotNamePrefix: 	snapshotNamePrefix,
+		csiConnection:          csiConnection,
+		timeout:                timeout,
+		snapshotNamePrefix:     snapshotNamePrefix,
 		snapshotNameUUIDLength: snapshotNameUUIDLength,
 	}
 }
 
-
-func (handler *csiHandler) CreateSnapshot(snapshot *crdv1.VolumeSnapshot, volume *v1.PersistentVolume, parameters map[string]string)  (string, string, int64, *csi.SnapshotStatus, error) {
+func (handler *csiHandler) CreateSnapshot(snapshot *crdv1.VolumeSnapshot, volume *v1.PersistentVolume, parameters map[string]string) (string, string, int64, *csi.SnapshotStatus, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), handler.timeout)
 	defer cancel()
