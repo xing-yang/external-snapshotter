@@ -83,6 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	glog.Infof("Start snapshot controller with Config: %v", config)
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Error(err.Error())
@@ -168,6 +169,8 @@ func main() {
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshotContents(),
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshotClasses(),
 		coreFactory.Core().V1().PersistentVolumeClaims(),
+		coreFactory.Storage().V1beta1().VolumeAttachments(),
+		coreFactory.Core().V1().Pods(),
 		*createSnapshotContentRetryCount,
 		*createSnapshotContentInterval,
 		csiConn,

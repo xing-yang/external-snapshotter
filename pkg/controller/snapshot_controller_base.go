@@ -23,18 +23,20 @@ import (
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	clientset "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
-	storageinformers "github.com/kubernetes-csi/external-snapshotter/pkg/client/informers/externalversions/volumesnapshot/v1alpha1"
-	storagelisters "github.com/kubernetes-csi/external-snapshotter/pkg/client/listers/volumesnapshot/v1alpha1"
+	snapinformers "github.com/kubernetes-csi/external-snapshotter/pkg/client/informers/externalversions/volumesnapshot/v1alpha1"
+	snaplisters "github.com/kubernetes-csi/external-snapshotter/pkg/client/listers/volumesnapshot/v1alpha1"
 	"github.com/kubernetes-csi/external-snapshotter/pkg/connection"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -49,14 +51,19 @@ type csiSnapshotController struct {
 	snapshotQueue   workqueue.RateLimitingInterface
 	contentQueue    workqueue.RateLimitingInterface
 
-	snapshotLister       storagelisters.VolumeSnapshotLister
+	snapshotLister       snaplisters.VolumeSnapshotLister
 	snapshotListerSynced cache.InformerSynced
-	contentLister        storagelisters.VolumeSnapshotContentLister
+	contentLister        snaplisters.VolumeSnapshotContentLister
 	contentListerSynced  cache.InformerSynced
-	classLister          storagelisters.VolumeSnapshotClassLister
+	classLister          snaplisters.VolumeSnapshotClassLister
 	classListerSynced    cache.InformerSynced
 	pvcLister            corelisters.PersistentVolumeClaimLister
 	pvcListerSynced      cache.InformerSynced
+
+	vaLister        storagelisters.VolumeAttachmentLister
+	vaListerSynced  cache.InformerSynced
+	podLister       corelisters.PodLister
+	podListerSynced cache.InformerSynced
 
 	snapshotStore cache.Store
 	contentStore  cache.Store
@@ -75,10 +82,12 @@ func NewCSISnapshotController(
 	clientset clientset.Interface,
 	client kubernetes.Interface,
 	snapshotterName string,
-	volumeSnapshotInformer storageinformers.VolumeSnapshotInformer,
-	volumeSnapshotContentInformer storageinformers.VolumeSnapshotContentInformer,
-	volumeSnapshotClassInformer storageinformers.VolumeSnapshotClassInformer,
+	volumeSnapshotInformer snapinformers.VolumeSnapshotInformer,
+	volumeSnapshotContentInformer snapinformers.VolumeSnapshotContentInformer,
+	volumeSnapshotClassInformer snapinformers.VolumeSnapshotClassInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	volumeAttachmentInformer storageinformers.VolumeAttachmentInformer,
+	podInformer coreinformers.PodInformer,
 	createSnapshotContentRetryCount int,
 	createSnapshotContentInterval time.Duration,
 	conn connection.CSIConnection,
@@ -137,6 +146,12 @@ func NewCSISnapshotController(
 	ctrl.classLister = volumeSnapshotClassInformer.Lister()
 	ctrl.classListerSynced = volumeSnapshotClassInformer.Informer().HasSynced
 
+	ctrl.vaLister = volumeAttachmentInformer.Lister()
+	ctrl.vaListerSynced = volumeAttachmentInformer.Informer().HasSynced
+
+	ctrl.podLister = podInformer.Lister()
+	ctrl.podListerSynced = podInformer.Informer().HasSynced
+
 	return ctrl
 }
 
@@ -147,7 +162,7 @@ func (ctrl *csiSnapshotController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting CSI snapshotter")
 	defer glog.Infof("Shutting CSI snapshotter")
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.contentListerSynced, ctrl.classListerSynced, ctrl.pvcListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.contentListerSynced, ctrl.classListerSynced, ctrl.pvcListerSynced, ctrl.vaListerSynced, ctrl.podListerSynced) {
 		glog.Errorf("Cannot sync caches")
 		return
 	}
@@ -463,7 +478,7 @@ func (ctrl *csiSnapshotController) deleteContent(content *crdv1.VolumeSnapshotCo
 // initializeCaches fills all controller caches with initial data from etcd in
 // order to have the caches already filled when first addSnapshot/addContent to
 // perform initial synchronization of the controller.
-func (ctrl *csiSnapshotController) initializeCaches(snapshotLister storagelisters.VolumeSnapshotLister, contentLister storagelisters.VolumeSnapshotContentLister) {
+func (ctrl *csiSnapshotController) initializeCaches(snapshotLister snaplisters.VolumeSnapshotLister, contentLister snaplisters.VolumeSnapshotContentLister) {
 	snapshotList, err := snapshotLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("CSISnapshotController can't initialize caches: %v", err)

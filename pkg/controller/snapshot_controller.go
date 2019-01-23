@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	"k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
+	//storagev1 "k8s.io/api/storage/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -593,6 +593,39 @@ func (ctrl *csiSnapshotController) checkandUpdateBoundSnapshotStatusOperation(sn
 func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.VolumeSnapshot) (*crdv1.VolumeSnapshot, error) {
 	glog.Infof("createSnapshot: Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
 
+	// Freeze before taking snapshot
+	glog.Infof("createSnapshot: Freeze before Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+	container, err := ctrl.executeHook(snapshot)
+	if container != nil {
+		glog.Infof("createSnapshot: Found container %v for snapshot %s ...", container, snapshotKey(snapshot))
+	}
+	//e := &defaultPodCommandExecutor{}
+	// command := []string{"echo Hi"}
+	//command := []string{"/usr/sbin/nginx -s quit"}
+	//command := []string{"mysql -u root -ppassword -D mysql -e \"FLUSH TABLES WITH READ LOCK;\""}
+	//command := []string{"//usr/bin/mysql -D mysql -e \"FLUSH TABLES WITH READ LOCK;\""}
+	//command := []string{"python /root/quiesce.py"}
+	//command := []string{"ls"}
+	command := []string{"run_quiesce.sh"}
+	glog.Infof("createSnapshot: command [%#v] Exe command [%#v] ...", command, container.QuiesceUnquiesceHook.Quiesce.Handler.Exec.Command)
+	myhook := ExecHook{
+		Container: container.Name,                                    //"mysql", //nginx",
+		Command:   command, //container.QuiesceUnquiesceHook.Quiesce.Handler.Exec.Command, //command,
+		OnError:   "",
+		Timeout:   1 * time.Minute,
+	}
+	hook := &myhook
+	// Snapshot can only be in the same namespace as the container and pod
+	namespace := snapshot.Namespace                          //"default"
+	name := container.Name                                    //"mysql" //"nginx"
+	er := ExecutePodCommand(namespace, name, "quiesce", hook) // works!!!
+	if er != nil {
+		glog.Infof("createSnapshot: failed to freeze before Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+		return nil, fmt.Errorf("failed to freeze before create snapshot %s: %q", snapshot.Name, er)
+	}
+	glog.Infof("createSnapshot: After freeze before Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+	// After Freeze call
+
 	if snapshot.Status.Error != nil && !isControllerUpdateFailError(snapshot.Status.Error) {
 		glog.V(4).Infof("error is already set in snapshot, do not retry to create: %s", snapshot.Status.Error.Message)
 		return snapshot, nil
@@ -608,6 +641,29 @@ func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.Volum
 		return nil, fmt.Errorf("failed to take snapshot of the volume, %s: %q", volume.Name, err)
 	}
 	glog.V(5).Infof("Created snapshot: driver %s, snapshotId %s, timestamp %d, size %d, readyToUse %t", driverName, snapshotID, timestamp, size, readyToUse)
+
+	// UnFreeze after taking snapshot
+	/*glog.Infof("createSnapshot: UnFreeze after Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+	//e := &defaultPodCommandExecutor{}
+	//command = []string{"/usr/sbin/nginx -s start"}
+	command = []string{"mysql -u root -ppassword -D mysql -e \"UNLOCK TABLES;\""}
+	myhook2 := ExecHook{
+		Container: "mysql", //"nginx",
+		Command:   command,
+		OnError:   "",
+		Timeout:   1 * time.Minute,
+	}
+	hook = &myhook2
+	namespace = "default"
+	name = "mysql" //"nginx"
+	er = ExecutePodCommand(namespace, name, "unquiesce", hook)
+	if er != nil {
+		glog.Infof("createSnapshot: failed to unfreeze after Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+		return nil, fmt.Errorf("failed to unfreeze after create snapshot %s: %q", snapshot.Name, er)
+	}
+	glog.Infof("createSnapshot: After unfreeze after Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+	// After UnFreeze call
+	*/
 
 	var newSnapshot *crdv1.VolumeSnapshot
 	// Update snapshot status with timestamp
@@ -849,7 +905,7 @@ func (ctrl *csiSnapshotController) getVolumeFromVolumeSnapshot(snapshot *crdv1.V
 	return pv, nil
 }
 
-func (ctrl *csiSnapshotController) getStorageClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*storagev1.StorageClass, error) {
+func (ctrl *csiSnapshotController) getStorageClassFromVolumeSnapshot(snapshot *crdv1.VolumeSnapshot) (*storage.StorageClass, error) {
 	// Get storage class from PVC or PV
 	pvc, err := ctrl.getClaimFromVolumeSnapshot(snapshot)
 	if err != nil {
@@ -866,7 +922,7 @@ func (ctrl *csiSnapshotController) getStorageClassFromVolumeSnapshot(snapshot *c
 	if len(storageclassName) == 0 {
 		return nil, fmt.Errorf("cannot figure out the snapshot class automatically, please specify one in snapshot spec.")
 	}
-	storageclass, err := ctrl.client.StorageV1().StorageClasses().Get(*pvc.Spec.StorageClassName, metav1.GetOptions{})
+	storageclass, err := ctrl.client.StorageV1beta1().StorageClasses().Get(*pvc.Spec.StorageClassName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -1053,4 +1109,168 @@ func (ctrl *csiSnapshotController) removeSnapshotFinalizer(snapshot *crdv1.Volum
 
 	glog.V(5).Infof("Removed protection finalizer from volume snapshot %s", snapshotKey(snapshot))
 	return nil
+}
+
+/*
+Snapshot controller watches VolumeAttachment object and search for a matching PersistentVolumeName
+With Snapshot’s source PersistentVolume.
+Attacher should be equal to Snapshotter.
+Also check VolumeAttachmentStatus Attached = true
+
+If it is attached, it means we need to do a freeze.
+Also from NodeName in VolumeAttachmentSpec, we can find out the matching pod that is using the PVC.
+
+Snapshot controller also watches PodSpec, and find out which pod this volume is being used.
+
+If containers[] in the pod contains execution hook, run it before snapshotting. (Option 1: Use PodCommandExec to run it remotely)
+Option 2: external-snapshotter pass the call to CSI driver to do freeze.  It needs to pass in the VolumeAttachment related info so that
+The CSI driver knows which filesystem it is and how to do fsfreeze.  Using Option 2, we don’t need Exec Hook in the Pod.
+*/
+func (ctrl *csiSnapshotController) executeHook(snapshot *crdv1.VolumeSnapshot) (*v1.Container, error) {
+	glog.Infof("executeHook before creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+
+	//pvcList, err := ctrl.pvcLister.PersistentVolumeClaims(snapshot.Namespace).List(labels.Everything())
+	//pvc, err := ctrl.pvcLister.PersistentVolumeClaims(snapshot.Namespace).Get(pvcName)
+
+	// VolumeAttachmentLister helps list VolumeAttachments.
+	//type VolumeAttachmentLister interface {
+	// List lists all VolumeAttachments in the indexer.
+	//List(selector labels.Selector) (ret []*v1beta1.VolumeAttachment, err error)
+	// Get retrieves the VolumeAttachment from the index for a given name.
+	//Get(name string) (*v1beta1.VolumeAttachment, error)
+	//VolumeAttachmentListerExpansion
+	//}
+	//va, err := ctrl.vaLister.Get(vaName)
+	pvc, err := ctrl.getClaimFromVolumeSnapshot(snapshot)
+	if err != nil {
+		glog.Errorf("executeHook: failed to getClaimFromVolumeSnapshot %s ...", snapshotKey(snapshot))
+		return nil, err
+	}
+	volume, err := ctrl.getVolumeFromVolumeSnapshot(snapshot)
+	if err != nil {
+		glog.Errorf("executeHook: failed to getVolumeFromVolumeSnapshot %s ...", snapshotKey(snapshot))
+		return nil, err
+	}
+	glog.Infof("executeHook: found volume %v ...", volume)
+	volumeattachments, err := ctrl.vaLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("executeHook: failed to get volumeattachments %s ...", snapshotKey(snapshot))
+		return nil, err
+	}
+	var foundVA *storage.VolumeAttachment = nil
+	for _, va := range volumeattachments {
+		glog.Infof("executeHook: looping thru volumeattachments %v ...", va)
+		if va.Spec.Source.PersistentVolumeName != nil {
+			// compare with PV name of snapshot source
+			if *(va.Spec.Source.PersistentVolumeName) == volume.Name {
+				foundVA = va.DeepCopy()
+				glog.Infof("executeHook: foundVA %v ...", foundVA)
+				break
+			}
+		}
+	}
+	if foundVA == nil {
+		glog.Infof("no attachment found when taking snapshot %s. No need to freeze", snapshot.Name)
+		return nil, nil
+	}
+	if foundVA.Spec.Attacher != ctrl.snapshotterName {
+		return nil, fmt.Errorf("Driver for attacher [%s] and snapshotter [%s] does not match for snapshot %s", foundVA.Spec.Attacher, ctrl.snapshotterName, snapshotKey(snapshot))
+	}
+	// TODO: Check status of va
+	var needToFreeze = false
+	if foundVA.Status.Attached == true {
+		needToFreeze = true
+	}
+	glog.V(5).Infof("syncSnapshot: Need to freeze is [%t] for VolumeSnapshot[%s]", needToFreeze, snapshotKey(snapshot))
+
+	// Go through the pods
+	// PodLister helps list Pods.
+	/*type PodLister interface {
+	  // List lists all Pods in the indexer.
+	  List(selector labels.Selector) (ret []*v1.Pod, err error)
+	  // Pods returns an object that can list and get Pods.
+	  Pods(namespace string) PodNamespaceLister
+	  PodListerExpansion
+	  }*/
+	pods, err := ctrl.podLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("executeHook: failed to get pods %s ...", snapshotKey(snapshot))
+		return nil, err
+	}
+	var foundPod *v1.Pod
+	for _, pd := range pods {
+		for _, vol := range pd.Spec.Volumes {
+			glog.V(5).Infof("executeHook: pod volumes %+v", vol)
+			if vol.VolumeSource.PersistentVolumeClaim != nil && vol.VolumeSource.PersistentVolumeClaim.ClaimName == pvc.Name {
+				foundPod = pd.DeepCopy()
+				glog.V(5).Infof("execHook Pod: [%+v]", foundPod)
+				break
+			}
+		}
+	}
+	for _, container := range foundPod.Spec.Containers {
+		glog.V(5).Infof("Container: [%+v]", container)
+		if container.QuiesceUnquiesceHook != nil {
+			glog.V(5).Infof("container.QuiesceUnquiesceHook: [%+v]", container.QuiesceUnquiesceHook)
+		}
+		//Run container.QuiesceUnquiesceHook.Quiesce.Exec.Command
+		// Create Pod subresource
+		// container.QuiesceUnquiesceHook.Quiesce.Exec.Command
+		// []Hooks under PodSpec or a parameter inside Container?
+		// If it is directly under PodSpec, we also need to add container name to it
+		// To run unquiesce, we have to make sure all snapshots are taken
+		//er := ExecutePodCommand(container.namespace, container.name, "quiesce", hook)
+		//if er != nil {
+		//	glog.Infof("execHook: failed to freeze before Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+		//	return nil, fmt.Errorf("failed to freeze before create snapshot %s: %q", snapshot.Name, er)
+		//}
+		return &container, nil
+	}
+	/*ExecutionHook:
+	  quiesceHook:
+	    exec:
+	      command: ["/usr/sbin/nginx","-s","quit";]
+	  unquiesceHook:
+	    exec:
+	      command: ["/usr/sbin/nginx","-s","start"]
+	*/
+
+	/*
+	   type ExecutionHook Struct {
+	       // A Trigger is in what condition the execution handler should be executed
+	       Trigger ExecutionHookTrigger
+
+	      // Command to execute for a particular trigger
+	      Handler
+
+	      // How long the controller should try/retry to execute the hook before giving up
+	      RetryTimeOutSeconds int
+	   }
+
+	   type ExecutionHookTrigger string
+
+	   const (
+	       PreSnapshot ExecutionHookTrigger = “PreSnapshot”
+	       PostSnapshot ExecutionHookTrigger = “PostSnapshot”
+	   )
+	   type Handler struct {
+	       // One and only one of the following should be specified.
+	       // Exec specifies the action to take.
+	       // +optional
+	       Exec *ExecAction
+	       // HTTPGet specifies the http request to perform.
+	       // +optional
+	       HTTPGet *HTTPGetAction
+	       // TCPSocket specifies an action involving a TCP port.
+	       // TODO: implement a realistic TCP lifecycle hook
+	       // +optional
+	       TCPSocket *TCPSocketAction
+	   }
+	   // ExecAction describes a "run in container" action.
+	   type ExecAction struct {
+	           // Command is the command line to execute inside the container
+	           Command []string
+	   }
+	*/
+	return nil, nil
 }

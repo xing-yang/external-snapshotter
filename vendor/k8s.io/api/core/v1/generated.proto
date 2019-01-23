@@ -720,6 +720,10 @@ message Container {
   // Default is false.
   // +optional
   optional bool tty = 18;
+
+  // Defines the hook to quiesce and unquiesce an application
+  // +optional
+  optional QuiesceUnquiesceHook quiesceUnquiesceHook = 22;
 }
 
 // Describe a container image
@@ -1210,6 +1214,18 @@ message ExecAction {
   // Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
   // +optional
   repeated string command = 1;
+}
+
+// ExecutionHook defines a specific action that should be taken with retries and timeouts
+message ExecutionHook {
+  // Command to execute for a particular trigger
+  optional Handler handler = 1;
+
+  // How long the controller should try/retry to execute the hook before giving up
+  optional int64 retryTimeOutSeconds = 2;
+
+  // Number of retries
+  optional int64 numRetries = 3;
 }
 
 // Represents a Fibre Channel volume.
@@ -3394,6 +3410,15 @@ message ProjectedVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+}
+
+// QuiesceUnquiesceHook includes a Quiesce action and an Unquiesce action
+message QuiesceUnquiesceHook {
+  // The hook to quiesce the application
+  optional ExecutionHook quiesce = 1;
+
+  // The hook to unquiesce the application
+  optional ExecutionHook unquiesce = 2;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.

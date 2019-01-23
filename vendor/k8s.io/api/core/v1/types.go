@@ -2036,6 +2036,24 @@ const (
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
 
+// ExecutionHook defines a specific action that should be taken with retries and timeouts
+type ExecutionHook struct {
+	// Command to execute for a particular trigger
+	Handler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
+	// How long the controller should try/retry to execute the hook before giving up
+	RetryTimeOutSeconds int64 `json:"retryTimeOutSeconds,omitempty" protobuf:"varint,2,opt,name=retryTimeOutSeconds"`
+	// Number of retries
+	NumRetries int64 `json:"numRetries,omitempty" protobuf:"varint,3,opt,name=numRetries"`
+}
+
+// QuiesceUnquiesceHook includes a Quiesce action and an Unquiesce action
+type QuiesceUnquiesceHook struct {
+	// The hook to quiesce the application
+	Quiesce *ExecutionHook `json:"quiesce,omitempty" protobuf:"bytes,1,opt,name=quiesce"`
+	// The hook to unquiesce the application
+	Unquiesce *ExecutionHook `json:"unquiesce,omitempty" protobuf:"bytes,2,opt,name=unquiesce"`
+}
+
 // A single application container that you want to run within a pod.
 type Container struct {
 	// Name of the container specified as a DNS_LABEL.
@@ -2187,6 +2205,9 @@ type Container struct {
 	// Default is false.
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
+	// Defines the hook to quiesce and unquiesce an application
+	// +optional
+	QuiesceUnquiesceHook *QuiesceUnquiesceHook `json:"quiesceUnquiesceHook,omitempty" protobuf:"bytes,22,opt,name=quiesceUnquiesceHook"`
 }
 
 // Handler defines a specific action that should be taken

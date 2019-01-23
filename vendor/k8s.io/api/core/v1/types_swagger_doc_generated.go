@@ -332,6 +332,7 @@ var map_Container = map[string]string{
 	"stdin":                    "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
 	"stdinOnce":                "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
 	"tty":                      "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+	"quiesceUnquiesceHook":     "Defines the hook to quiesce and unquiesce an application",
 }
 
 func (Container) SwaggerDoc() map[string]string {
@@ -621,6 +622,16 @@ var map_ExecAction = map[string]string{
 
 func (ExecAction) SwaggerDoc() map[string]string {
 	return map_ExecAction
+}
+
+var map_ExecutionHook = map[string]string{
+	"":                    "ExecutionHook defines a specific action that should be taken with retries and timeouts",
+	"retryTimeOutSeconds": "How long the controller should try/retry to execute the hook before giving up",
+	"numRetries":          "Number of retries",
+}
+
+func (ExecutionHook) SwaggerDoc() map[string]string {
+	return map_ExecutionHook
 }
 
 var map_FCVolumeSource = map[string]string{
@@ -1669,6 +1680,16 @@ var map_ProjectedVolumeSource = map[string]string{
 
 func (ProjectedVolumeSource) SwaggerDoc() map[string]string {
 	return map_ProjectedVolumeSource
+}
+
+var map_QuiesceUnquiesceHook = map[string]string{
+	"":          "QuiesceUnquiesceHook includes a Quiesce action and an Unquiesce action",
+	"quiesce":   "The hook to quiesce the application",
+	"unquiesce": "The hook to unquiesce the application",
+}
+
+func (QuiesceUnquiesceHook) SwaggerDoc() map[string]string {
+	return map_QuiesceUnquiesceHook
 }
 
 var map_QuobyteVolumeSource = map[string]string{
