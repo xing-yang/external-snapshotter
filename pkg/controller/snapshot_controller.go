@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	hookapi "github.com/kubernetes-csi/execution-hook/pkg/apis/executionhook/v1alpha1"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -612,6 +613,14 @@ func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.Volum
 		return snapshot, nil
 	}
 
+	// Create ExecutionHook to Freeze before taking snapshot
+	klog.Infof("createSnapshot: Freeze before Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+	err := ctrl.createExecutionHook(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create hook before taking snapshot, %s: %q", snapshotKey(snapshot), err)
+	}
+	// After creating ExecutionHook
+
 	class, volume, contentName, snapshotterCredentials, err := ctrl.getCreateSnapshotInput(snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input parameters to create snapshot %s: %q", snapshot.Name, err)
@@ -622,6 +631,15 @@ func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.Volum
 		return nil, fmt.Errorf("failed to take snapshot of the volume, %s: %q", volume.Name, err)
 	}
 	klog.V(5).Infof("Created snapshot: driver %s, snapshotId %s, timestamp %d, size %d, readyToUse %t", driverName, snapshotID, timestamp, size, readyToUse)
+
+	// Delete ExecutionHook to Unfreeze after taking snapshot
+	klog.Infof("createSnapshot: Unfreeze after Creating snapshot %s through the plugin ...", snapshotKey(snapshot))
+	// TODO: deleteExecutionHook
+	//err := ctrl.deleteExecutionHook(snapshot)
+	//if err != nil {
+	//        return nil, fmt.Errorf("failed to delete hook after taking snapshot, %s: %q", snapshotKey(snapshot), err)
+	//}
+	// After deleting ExecutionHook
 
 	var newSnapshot *crdv1.VolumeSnapshot
 	// Update snapshot status with timestamp
@@ -705,6 +723,103 @@ func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.Volum
 		return nil, err
 	}
 	return result, nil
+}
+
+func (ctrl *csiSnapshotController) createExecutionHook(snapshot *crdv1.VolumeSnapshot) error {
+	klog.Infof("createExecutionHook: Creating ExecutionHook before taking snapshot %s ...", snapshotKey(snapshot))
+	// TODO: Retrieve ExecutionHookTemplate and create hook in a loop because it is a list
+	klog.Infof("createExecutionHook: snapshot %s hook infos [%+v] len [%d]", snapshotKey(snapshot), snapshot.Spec.ExecutionHookInfos, len(snapshot.Spec.ExecutionHookInfos))
+	klog.Infof("createExecutionHook: snapshot %s template name [%s]", snapshotKey(snapshot), snapshot.Spec.ExecutionHookInfos[0].ExecutionHookTemplateName)
+	template, err := ctrl.hookTemplateLister.ExecutionHookTemplates(snapshot.Namespace).Get(snapshot.Spec.ExecutionHookInfos[0].ExecutionHookTemplateName)
+	if err != nil {
+		return fmt.Errorf("error get hook template %s from api server: %v", snapshot.Spec.ExecutionHookInfos[0].ExecutionHookTemplateName, err)
+	}
+
+	// Find Pod/Container names
+	// TODO: Find Pod/Container dymatically if PodContainerNamesList and Pod/Container selectors
+	// are not defined
+	klog.Infof("createExecutionHook: snapshot %s PodContainerNamesList [%+v]", snapshotKey(snapshot), snapshot.Spec.ExecutionHookInfos[0].PodContainerNamesList)
+	podContainers := snapshot.Spec.ExecutionHookInfos[0].PodContainerNamesList
+
+	// TODO: create a hook name
+	hookName := fmt.Sprintf("%s-%s", snapshot.Name, template.Name)
+
+	// Create ExecutionHook based the hook template
+	hook := &hookapi.ExecutionHook{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hookName,
+			Namespace: snapshot.Namespace,
+		},
+		Spec: hookapi.ExecutionHookSpec{
+			PodContainerNamesList: podContainers,
+			PreAction:             template.PreAction,
+			PostAction:            template.PostAction,
+		},
+	}
+
+	klog.Infof("createExecutionHook: snapshot %s construct new hook [%+v]", snapshotKey(snapshot), hook)
+
+	// Create an ExecutionHook. This will trigger the ExecutionHook controller to run the hook
+	if _, err = ctrl.hookClientset.ExecutionhookV1alpha1().ExecutionHooks(snapshot.Namespace).Create(hook); err == nil || apierrs.IsAlreadyExists(err) {
+		// Save succeeded.
+		if err != nil {
+			klog.V(3).Infof("Hook %q for snapshot %q already exists, reusing", hook.Name, snapshotKey(snapshot))
+			err = nil
+		} else {
+			klog.V(3).Infof("Hook %q for snapshot %q saved, %v", hook.Name, snapshotKey(snapshot), hook)
+		}
+	}
+
+	// TODO: Save hook name to VolumeSnapshot object
+
+	return nil
+}
+
+func (ctrl *csiSnapshotController) deleteExecutionHook(snapshot *crdv1.VolumeSnapshot) error {
+	/*klog.Infof("createExecutionHook: Creating ExecutionHook before taking snapshot %s ...", snapshotKey(snapshot))
+	  // TODO: Retrieve ExecutionHookTemplate and create hook in a loop because it is a list
+	  klog.Infof("createExecutionHook: snapshot %s hook infos [%+v] len [%d]", snapshotKey(snapshot), snapshot.Spec.ExecutionHookInfos, len(snapshot.Spec.ExecutionHookInfos))
+	  klog.Infof("createExecutionHook: snapshot %s template name [%s]", snapshotKey(snapshot), snapshot.Spec.ExecutionHookInfos[0].ExecutionHookTemplateName)
+	  template, err := ctrl.hookTemplateLister.ExecutionHookTemplates(snapshot.Namespace).Get(snapshot.Spec.ExecutionHookInfos[0].ExecutionHookTemplateName)
+	  if err != nil {
+	          return fmt.Errorf("error get hook template %s from api server: %v", snapshot.Spec.ExecutionHookInfos[0].ExecutionHookTemplateName, err)
+	  }
+
+	  // Find Pod/Container names
+	  // TODO: Find Pod/Container dymatically if PodContainerNamesList and Pod/Container selectors
+	  // are not defined
+	  klog.Infof("createExecutionHook: snapshot %s PodContainerNamesList [%+v]", snapshotKey(snapshot), snapshot.Spec.ExecutionHookInfos[0].PodContainerNamesList)
+	  podContainers := snapshot.Spec.ExecutionHookInfos[0].PodContainerNamesList
+
+	  // TODO: create a hook name
+	  hookName := fmt.Sprintf("%s-%s", snapshot.Name, template.Name)
+
+	  // Create ExecutionHook based the hook template
+	  hook := &hookapi.ExecutionHook{
+	          ObjectMeta: metav1.ObjectMeta{
+	                  Name:      hookName,
+	                  Namespace: snapshot.Namespace,
+	          },
+	          Spec: hookapi.ExecutionHookSpec{
+	                  PodContainerNamesList: podContainers,
+	                  PreAction:             template.PreAction,
+	                  PostAction:            template.PostAction,
+	          },
+	  }
+
+	  klog.Infof("createExecutionHook: snapshot %s construct new hook [%+v]", snapshotKey(snapshot), hook)
+
+	  // Create an ExecutionHook. This will trigger the ExecutionHook controller to run the hook
+	  if _, err = ctrl.hookClientset.ExecutionhookV1alpha1().ExecutionHooks(snapshot.Namespace).Create(hook); err == nil || apierrs.IsAlreadyExists(err) {
+	          // Save succeeded.
+	          if err != nil {
+	                  klog.V(3).Infof("Hook %q for snapshot %q already exists, reusing", hook.Name, snapshotKey(snapshot))
+	                  err = nil
+	          } else {
+	                  klog.V(3).Infof("Hook %q for snapshot %q saved, %v", hook.Name, snapshotKey(snapshot), hook)
+	          }
+	  }*/
+	return nil
 }
 
 // Delete a snapshot

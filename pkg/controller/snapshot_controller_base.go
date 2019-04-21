@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	hookclientset "github.com/kubernetes-csi/execution-hook/pkg/client/clientset/versioned"
+	hookinformers "github.com/kubernetes-csi/execution-hook/pkg/client/informers/externalversions/executionhook/v1alpha1"
+	hooklisters "github.com/kubernetes-csi/execution-hook/pkg/client/listers/executionhook/v1alpha1"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/pkg/apis/volumesnapshot/v1alpha1"
 	clientset "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
 	storageinformers "github.com/kubernetes-csi/external-snapshotter/pkg/client/informers/externalversions/volumesnapshot/v1alpha1"
@@ -45,19 +48,24 @@ import (
 type csiSnapshotController struct {
 	clientset       clientset.Interface
 	client          kubernetes.Interface
+	hookClientset   hookclientset.Interface
 	snapshotterName string
 	eventRecorder   record.EventRecorder
 	snapshotQueue   workqueue.RateLimitingInterface
 	contentQueue    workqueue.RateLimitingInterface
 
-	snapshotLister       storagelisters.VolumeSnapshotLister
-	snapshotListerSynced cache.InformerSynced
-	contentLister        storagelisters.VolumeSnapshotContentLister
-	contentListerSynced  cache.InformerSynced
-	classLister          storagelisters.VolumeSnapshotClassLister
-	classListerSynced    cache.InformerSynced
-	pvcLister            corelisters.PersistentVolumeClaimLister
-	pvcListerSynced      cache.InformerSynced
+	snapshotLister           storagelisters.VolumeSnapshotLister
+	snapshotListerSynced     cache.InformerSynced
+	contentLister            storagelisters.VolumeSnapshotContentLister
+	contentListerSynced      cache.InformerSynced
+	classLister              storagelisters.VolumeSnapshotClassLister
+	classListerSynced        cache.InformerSynced
+	pvcLister                corelisters.PersistentVolumeClaimLister
+	pvcListerSynced          cache.InformerSynced
+	hookLister               hooklisters.ExecutionHookLister
+	hookListerSynced         cache.InformerSynced
+	hookTemplateLister       hooklisters.ExecutionHookTemplateLister
+	hookTemplateListerSynced cache.InformerSynced
 
 	snapshotStore cache.Store
 	contentStore  cache.Store
@@ -75,11 +83,14 @@ type csiSnapshotController struct {
 func NewCSISnapshotController(
 	clientset clientset.Interface,
 	client kubernetes.Interface,
+	hookClientset hookclientset.Interface,
 	snapshotterName string,
 	volumeSnapshotInformer storageinformers.VolumeSnapshotInformer,
 	volumeSnapshotContentInformer storageinformers.VolumeSnapshotContentInformer,
 	volumeSnapshotClassInformer storageinformers.VolumeSnapshotClassInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	hookInformer hookinformers.ExecutionHookInformer,
+	hookTemplateInformer hookinformers.ExecutionHookTemplateInformer,
 	createSnapshotContentRetryCount int,
 	createSnapshotContentInterval time.Duration,
 	snapshotter snapshotter.Snapshotter,
@@ -97,6 +108,7 @@ func NewCSISnapshotController(
 	ctrl := &csiSnapshotController{
 		clientset:                       clientset,
 		client:                          client,
+		hookClientset:                   hookClientset,
 		snapshotterName:                 snapshotterName,
 		eventRecorder:                   eventRecorder,
 		handler:                         NewCSIHandler(snapshotter, timeout, snapshotNamePrefix, snapshotNameUUIDLength),
@@ -112,6 +124,12 @@ func NewCSISnapshotController(
 
 	ctrl.pvcLister = pvcInformer.Lister()
 	ctrl.pvcListerSynced = pvcInformer.Informer().HasSynced
+
+	ctrl.hookLister = hookInformer.Lister()
+	ctrl.hookListerSynced = hookInformer.Informer().HasSynced
+
+	ctrl.hookTemplateLister = hookTemplateInformer.Lister()
+	ctrl.hookTemplateListerSynced = hookTemplateInformer.Informer().HasSynced
 
 	volumeSnapshotInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -148,7 +166,7 @@ func (ctrl *csiSnapshotController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting CSI snapshotter")
 	defer klog.Infof("Shutting CSI snapshotter")
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.contentListerSynced, ctrl.classListerSynced, ctrl.pvcListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.contentListerSynced, ctrl.classListerSynced, ctrl.pvcListerSynced, ctrl.hookListerSynced, ctrl.hookTemplateListerSynced) {
 		klog.Errorf("Cannot sync caches")
 		return
 	}

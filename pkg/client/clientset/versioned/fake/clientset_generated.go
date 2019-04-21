@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,10 +73,5 @@ var _ clientset.Interface = &Clientset{}
 
 // VolumesnapshotV1alpha1 retrieves the VolumesnapshotV1alpha1Client
 func (c *Clientset) VolumesnapshotV1alpha1() volumesnapshotv1alpha1.VolumesnapshotV1alpha1Interface {
-	return &fakevolumesnapshotv1alpha1.FakeVolumesnapshotV1alpha1{Fake: &c.Fake}
-}
-
-// Volumesnapshot retrieves the VolumesnapshotV1alpha1Client
-func (c *Clientset) Volumesnapshot() volumesnapshotv1alpha1.VolumesnapshotV1alpha1Interface {
 	return &fakevolumesnapshotv1alpha1.FakeVolumesnapshotV1alpha1{Fake: &c.Fake}
 }

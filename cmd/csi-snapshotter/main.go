@@ -39,6 +39,8 @@ import (
 	"github.com/kubernetes-csi/external-snapshotter/pkg/controller"
 	"github.com/kubernetes-csi/external-snapshotter/pkg/snapshotter"
 
+	hookclientset "github.com/kubernetes-csi/execution-hook/pkg/client/clientset/versioned"
+	hookinformers "github.com/kubernetes-csi/execution-hook/pkg/client/informers/externalversions"
 	clientset "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned"
 	snapshotscheme "github.com/kubernetes-csi/external-snapshotter/pkg/client/clientset/versioned/scheme"
 	informers "github.com/kubernetes-csi/external-snapshotter/pkg/client/informers/externalversions"
@@ -115,8 +117,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	hookClient, err := hookclientset.NewForConfig(config)
+	if err != nil {
+		klog.Errorf("Error building hook clientset: %s", err.Error())
+		os.Exit(1)
+	}
+
 	factory := informers.NewSharedInformerFactory(snapClient, *resyncPeriod)
 	coreFactory := coreinformers.NewSharedInformerFactory(kubeClient, *resyncPeriod)
+	hookFactory := hookinformers.NewSharedInformerFactory(hookClient, *resyncPeriod)
 
 	// Create CRD resource
 	aeclientset, err := apiextensionsclient.NewForConfig(config)
@@ -183,11 +192,14 @@ func main() {
 	ctrl := controller.NewCSISnapshotController(
 		snapClient,
 		kubeClient,
+		hookClient,
 		*snapshotterName,
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshots(),
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshotContents(),
 		factory.Volumesnapshot().V1alpha1().VolumeSnapshotClasses(),
 		coreFactory.Core().V1().PersistentVolumeClaims(),
+		hookFactory.Executionhook().V1alpha1().ExecutionHooks(),
+		hookFactory.Executionhook().V1alpha1().ExecutionHookTemplates(),
 		*createSnapshotContentRetryCount,
 		*createSnapshotContentInterval,
 		snapShotter,
@@ -202,6 +214,7 @@ func main() {
 		stopCh := make(chan struct{})
 		factory.Start(stopCh)
 		coreFactory.Start(stopCh)
+		hookFactory.Start(stopCh)
 		go ctrl.Run(threads, stopCh)
 
 		// ...until SIGINT

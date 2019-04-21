@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	VolumesnapshotV1alpha1() volumesnapshotv1alpha1.VolumesnapshotV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Volumesnapshot() volumesnapshotv1alpha1.VolumesnapshotV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // VolumesnapshotV1alpha1 retrieves the VolumesnapshotV1alpha1Client
 func (c *Clientset) VolumesnapshotV1alpha1() volumesnapshotv1alpha1.VolumesnapshotV1alpha1Interface {
-	return c.volumesnapshotV1alpha1
-}
-
-// Deprecated: Volumesnapshot retrieves the default version of VolumesnapshotClient.
-// Please explicitly pick a version.
-func (c *Clientset) Volumesnapshot() volumesnapshotv1alpha1.VolumesnapshotV1alpha1Interface {
 	return c.volumesnapshotV1alpha1
 }
 

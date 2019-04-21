@@ -21,6 +21,7 @@ import (
 	storage "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	hookapi "github.com/kubernetes-csi/execution-hook/pkg/apis/executionhook/v1alpha1"
 )
 
 const (
@@ -81,6 +82,13 @@ type VolumeSnapshotSpec struct {
 	// be used if it is available.
 	// +optional
 	VolumeSnapshotClassName *string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
+
+        // List of ExecutionHookInfo. It is used to build ExecutionHooks
+	// Hooks will be run sequencially now.
+	// TODO: In the future, we may add ExecutionOrdering to indicate the ordering
+	// of running the hooks.
+        // +optional
+        ExecutionHookInfos []hookapi.ExecutionHookInfo `json:"executionHookInfos" protobuf:"bytes,4,rep,name=executionHookInfos"`
 }
 
 // VolumeSnapshotStatus is the status of the VolumeSnapshot

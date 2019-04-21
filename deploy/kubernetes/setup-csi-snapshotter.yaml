@@ -85,20 +85,21 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-snapshotter
-          image: quay.io/k8scsi/csi-snapshotter:v1.0.1
+          image: test-snapshotter:hook #quay.io/k8scsi/csi-snapshotter:v1.0.1
           args:
             - "--csi-address=$(ADDRESS)"
             - "--connection-timeout=15s"
             - "--leader-election=false"
+            - "--v=5"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent #Always
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.0.1
+          image: quay.io/k8scsi/hostpathplugin:canary #v1.0.1
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
