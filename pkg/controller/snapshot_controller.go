@@ -694,11 +694,11 @@ func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.Volum
 	}
 
 	// Set AnnDeletionSecretRefName and AnnDeletionSecretRefNamespace
-	if !metav1.HasAnnotation(snapshotContent.ObjectMeta, AnnDeletionSecretRefName) {
+	if !metav1.HasAnnotation(snapshotContent.ObjectMeta, AnnDeletionSecretRefName) && snapshotterSecretRef != nil {
 		klog.V(5).Infof("createSnapshotOperation: set annotation [%s] on content [%s].", AnnDeletionSecretRefName, snapshotContent.Name)
 		metav1.SetMetaDataAnnotation(&snapshotContent.ObjectMeta, AnnDeletionSecretRefName, snapshotterSecretRef.Name)
 	}
-	if !metav1.HasAnnotation(snapshotContent.ObjectMeta, AnnDeletionSecretRefNamespace) {
+	if !metav1.HasAnnotation(snapshotContent.ObjectMeta, AnnDeletionSecretRefNamespace) && snapshotterSecretRef != nil {
 		klog.V(5).Infof("syncContent: set annotation [%s] on content [%s].", AnnDeletionSecretRefNamespace, snapshotContent.Name)
 		metav1.SetMetaDataAnnotation(&snapshotContent.ObjectMeta, AnnDeletionSecretRefNamespace, snapshotterSecretRef.Namespace)
 	}

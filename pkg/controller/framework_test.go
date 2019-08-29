@@ -790,11 +790,12 @@ func newTestController(kubeClient kubernetes.Interface, clientset clientset.Inte
 }
 
 // newContent returns a new content with given attributes
-func newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName string, deletionPolicy *crdv1.DeletionPolicy, size *int64, creationTime *int64, withFinalizer bool) *crdv1.VolumeSnapshotContent {
+func newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName string, deletionPolicy *crdv1.DeletionPolicy, size *int64, creationTime *int64, withFinalizer bool, annotations map[string]string) *crdv1.VolumeSnapshotContent {
 	content := crdv1.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			ResourceVersion: "1",
+			Annotations:     annotations,
 		},
 		Spec: crdv1.VolumeSnapshotContentSpec{
 			VolumeSnapshotSource: crdv1.VolumeSnapshotSource{
@@ -833,14 +834,14 @@ func newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToS
 	return &content
 }
 
-func newContentArray(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName string, deletionPolicy *crdv1.DeletionPolicy, size *int64, creationTime *int64, withFinalizer bool) []*crdv1.VolumeSnapshotContent {
+func newContentArray(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName string, deletionPolicy *crdv1.DeletionPolicy, size *int64, creationTime *int64, withFinalizer bool, annotations map[string]string) []*crdv1.VolumeSnapshotContent {
 	return []*crdv1.VolumeSnapshotContent{
-		newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName, deletionPolicy, size, creationTime, withFinalizer),
+		newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName, deletionPolicy, size, creationTime, withFinalizer, annotations),
 	}
 }
 
 func newContentWithUnmatchDriverArray(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName string, deletionPolicy *crdv1.DeletionPolicy, size *int64, creationTime *int64) []*crdv1.VolumeSnapshotContent {
-	content := newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName, deletionPolicy, size, creationTime, false)
+	content := newContent(name, className, snapshotHandle, volumeUID, volumeName, boundToSnapshotUID, boundToSnapshotName, deletionPolicy, size, creationTime, false, nil)
 	content.Spec.VolumeSnapshotSource.CSI.Driver = "fake"
 	return []*crdv1.VolumeSnapshotContent{
 		content,
@@ -1287,6 +1288,27 @@ func secret() *v1.Secret {
 	}
 }
 
+func secretAnnotations() map[string]string {
+	return map[string]string{
+		AnnDeletionSecretRefName:      "secret",
+		AnnDeletionSecretRefNamespace: "default",
+	}
+}
+
+func emptySecretAnnotations() map[string]string {
+	return map[string]string{
+		AnnDeletionSecretRefName:      "emptysecret",
+		AnnDeletionSecretRefNamespace: "default",
+	}
+}
+
+func invalidSecretAnnotations() map[string]string {
+	return map[string]string{
+		"secret":                      "s",
+		AnnDeletionSecretRefNamespace: "d",
+	}
+}
+
 type listCall struct {
 	snapshotID string
 	// information to return
@@ -1368,7 +1390,7 @@ func (f *fakeSnapshotter) CreateSnapshot(ctx context.Context, snapshotName strin
 func (f *fakeSnapshotter) DeleteSnapshot(ctx context.Context, snapshotID string, snapshotterCredentials map[string]string) error {
 	if f.deleteCallCounter >= len(f.deleteCalls) {
 		f.t.Errorf("Unexpected CSI Delete Snapshot call: snapshotID=%s, index: %d, calls: %+v", snapshotID, f.createCallCounter, f.createCalls)
-		return fmt.Errorf("unexpected call")
+		return fmt.Errorf("unexpected DeleteSnapshot call")
 	}
 	call := f.deleteCalls[f.deleteCallCounter]
 	f.deleteCallCounter++
