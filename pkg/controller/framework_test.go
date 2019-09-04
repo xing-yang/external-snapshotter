@@ -425,9 +425,7 @@ func (r *snapshotReactor) checkContents(expectedContents []*crdv1.VolumeSnapshot
 		if v.Spec.VolumeSnapshotRef != nil {
 			v.Spec.VolumeSnapshotRef.ResourceVersion = ""
 		}
-		if v.Spec.CSI != nil {
-			v.Spec.CSI.CreationTime = nil
-		}
+		v.Spec.CreationTime = nil
 		expectedMap[v.Name] = v
 	}
 	for _, v := range r.contents {
@@ -438,9 +436,7 @@ func (r *snapshotReactor) checkContents(expectedContents []*crdv1.VolumeSnapshot
 		if v.Spec.VolumeSnapshotRef != nil {
 			v.Spec.VolumeSnapshotRef.ResourceVersion = ""
 		}
-		if v.Spec.CSI != nil {
-			v.Spec.CSI.CreationTime = nil
-		}
+		v.Spec.CreationTime = nil
 		gotMap[v.Name] = v
 	}
 	if !reflect.DeepEqual(expectedMap, gotMap) {
@@ -790,14 +786,10 @@ func newContent(name, snapshotHandle, boundToSnapshotUID, boundToSnapshotName st
 			ResourceVersion: "1",
 		},
 		Spec: crdv1.VolumeSnapshotContentSpec{
-			VolumeSnapshotSource: crdv1.VolumeSnapshotSource{
-				CSI: &crdv1.CSIVolumeSnapshotSource{
-					RestoreSize:    size,
-					Driver:         mockDriverName,
-					SnapshotHandle: snapshotHandle,
-					CreationTime:   creationTime,
-				},
-			},
+			RestoreSize:    size,
+			Driver:         mockDriverName,
+			SnapshotHandle: snapshotHandle,
+			CreationTime:   creationTime,
 			DeletionPolicy: deletionPolicy,
 		},
 	}
@@ -825,7 +817,7 @@ func newContentArray(name, snapshotHandle, boundToSnapshotUID, boundToSnapshotNa
 
 func newContentWithUnmatchDriverArray(name, snapshotHandle, boundToSnapshotUID, boundToSnapshotName string, deletionPolicy *crdv1.DeletionPolicy, size *int64, creationTime *int64) []*crdv1.VolumeSnapshotContent {
 	content := newContent(name, snapshotHandle, boundToSnapshotUID, boundToSnapshotName, deletionPolicy, size, creationTime, false)
-	content.Spec.VolumeSnapshotSource.CSI.Driver = "fake"
+	content.Spec.Driver = "fake"
 	return []*crdv1.VolumeSnapshotContent{
 		content,
 	}

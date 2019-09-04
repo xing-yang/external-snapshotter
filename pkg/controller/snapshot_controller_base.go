@@ -325,11 +325,7 @@ func (ctrl *csiSnapshotController) contentWorker() {
 
 // verify whether the driver specified in VolumeSnapshotContent matches the controller's driver name
 func (ctrl *csiSnapshotController) isDriverMatch(content *crdv1.VolumeSnapshotContent) bool {
-	if content.Spec.VolumeSnapshotSource.CSI == nil {
-		// Skip this snapshot content if it not a CSI snapshot
-		return false
-	}
-	if content.Spec.VolumeSnapshotSource.CSI.Driver != ctrl.driverName {
+	if content.Spec.Driver != ctrl.driverName {
 		// Skip this snapshot content if the driver does not match
 		return false
 	}
