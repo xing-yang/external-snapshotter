@@ -441,7 +441,15 @@ func (ctrl *csiSnapshotController) updateSnapshotErrorStatusWithEvent(snapshot *
 
 // Stateless functions
 func getSnapshotStatusForLogging(snapshot *crdv1.VolumeSnapshot) string {
-	return fmt.Sprintf("bound to: %q, Completed: %v", *snapshot.Spec.VolumeSnapshotContentName, *snapshot.Status.ReadyToUse)
+	name := ""
+	ready := false
+	if snapshot.Spec.VolumeSnapshotContentName != nil {
+		name = *snapshot.Spec.VolumeSnapshotContentName
+	}
+	if snapshot.Status.ReadyToUse != nil {
+		ready = *snapshot.Status.ReadyToUse
+	}
+	return fmt.Sprintf("bound to: %q, Completed: %v", name, ready)
 }
 
 // IsSnapshotBound returns true/false if snapshot is bound
@@ -572,9 +580,8 @@ func (ctrl *csiSnapshotController) checkandUpdateBoundSnapshotStatusOperation(sn
 			klog.Errorf("checkandUpdateBoundSnapshotStatusOperation: failed to call get snapshot status to check whether snapshot is ready to use %q", err)
 			return nil, err
 		}
-		if content.Spec.CSI != nil {
-			driverName, snapshotID = content.Spec.CSI.Driver, content.Spec.CSI.SnapshotHandle
-		}
+		driverName = content.Spec.Driver
+		snapshotID = content.Spec.SnapshotHandle
 	} else {
 		class, volume, _, snapshotterCredentials, err := ctrl.getCreateSnapshotInput(snapshot)
 		if err != nil {
@@ -666,15 +673,11 @@ func (ctrl *csiSnapshotController) createSnapshotOperation(snapshot *crdv1.Volum
 		},
 		Spec: crdv1.VolumeSnapshotContentSpec{
 			VolumeSnapshotRef: snapshotRef,
-			VolumeSnapshotSource: crdv1.VolumeSnapshotSource{
-				CSI: &crdv1.CSIVolumeSnapshotSource{
-					Driver:         driverName,
-					SnapshotHandle: snapshotID,
-					CreationTime:   &timestamp,
-					RestoreSize:    &size,
-				},
-			},
-			DeletionPolicy: class.DeletionPolicy,
+			Driver:            driverName,
+			SnapshotHandle:    snapshotID,
+			CreationTime:      &timestamp,
+			RestoreSize:       &size,
+			DeletionPolicy:    class.DeletionPolicy,
 		},
 	}
 	klog.V(3).Infof("volume snapshot content %v", snapshotContent)
@@ -790,14 +793,14 @@ func (ctrl *csiSnapshotController) bindandUpdateVolumeSnapshot(snapshotContent *
 
 // updateSnapshotContentSize update the restore size for snapshot content
 func (ctrl *csiSnapshotController) updateSnapshotContentSize(content *crdv1.VolumeSnapshotContent, size int64) error {
-	if content.Spec.VolumeSnapshotSource.CSI == nil || size <= 0 {
+	if size <= 0 {
 		return nil
 	}
-	if content.Spec.VolumeSnapshotSource.CSI.RestoreSize != nil && *content.Spec.VolumeSnapshotSource.CSI.RestoreSize == size {
+	if content.Spec.RestoreSize != nil && *content.Spec.RestoreSize == size {
 		return nil
 	}
 	contentClone := content.DeepCopy()
-	contentClone.Spec.VolumeSnapshotSource.CSI.RestoreSize = &size
+	contentClone.Spec.RestoreSize = &size
 	_, err := ctrl.clientset.SnapshotV1beta1().VolumeSnapshotContents().Update(contentClone)
 	if err != nil {
 		return newControllerUpdateError(content.Name, err.Error())
