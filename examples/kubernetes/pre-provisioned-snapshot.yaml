@@ -1,0 +1,7 @@
+apiVersion: snapshot.storage.k8s.io/v1beta1
+kind: VolumeSnapshot
+metadata:
+  name: new-snapshot-test
+spec:
+  source:
+    volumeSnapshotContentName: new-snapshot-content-test
