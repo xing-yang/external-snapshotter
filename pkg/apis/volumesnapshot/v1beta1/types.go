@@ -161,6 +161,13 @@ type VolumeSnapshotStatus struct {
 	Error *VolumeSnapshotError `json:"error,omitempty" protobuf:"bytes,5,opt,name=error,casttype=VolumeSnapshotError"`
 }
 
+type Hook struct {
+        name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+        containerName string `json:"containerName" protobuf:"bytes,2,opt,name=containerName"`
+        // +optional
+        podName *string `json:"podName,omitempty" protobuf:"bytes,3,opt,name=podName"`
+}
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -197,6 +204,10 @@ type VolumeSnapshotClass struct {
 	// "Delete" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are deleted.
 	// Required.
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy" protobuf:"bytes,4,opt,name=deletionPolicy"`
+	// +optional
+	PreHooks []Hook `json:"preHooks" protobuf:"bytes,5,rep,name=preHooks"`
+        // +optional
+	PostHooks []Hook `json:"postHooks" protobuf:"bytes,6,rep,name=postHooks"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
