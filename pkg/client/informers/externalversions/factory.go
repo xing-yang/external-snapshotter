@@ -24,6 +24,7 @@ import (
 	time "time"
 
 	versioned "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	backupdriver "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions/backupdriver"
 	internalinterfaces "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions/internalinterfaces"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions/volumesnapshot"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,7 +173,12 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	Backupdriver() backupdriver.Interface
 	Snapshot() volumesnapshot.Interface
+}
+
+func (f *sharedInformerFactory) Backupdriver() backupdriver.Interface {
+	return backupdriver.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Snapshot() volumesnapshot.Interface {

@@ -21,6 +21,7 @@ package versioned
 import (
 	"fmt"
 
+	backupdriverv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/backupdriver/v1"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -29,6 +30,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	BackupdriverV1() backupdriverv1.BackupdriverV1Interface
 	SnapshotV1beta1() snapshotv1beta1.SnapshotV1beta1Interface
 }
 
@@ -36,7 +38,13 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	backupdriverV1  *backupdriverv1.BackupdriverV1Client
 	snapshotV1beta1 *snapshotv1beta1.SnapshotV1beta1Client
+}
+
+// BackupdriverV1 retrieves the BackupdriverV1Client
+func (c *Clientset) BackupdriverV1() backupdriverv1.BackupdriverV1Interface {
+	return c.backupdriverV1
 }
 
 // SnapshotV1beta1 retrieves the SnapshotV1beta1Client
@@ -65,6 +73,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.backupdriverV1, err = backupdriverv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.snapshotV1beta1, err = snapshotv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -81,6 +93,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.backupdriverV1 = backupdriverv1.NewForConfigOrDie(c)
 	cs.snapshotV1beta1 = snapshotv1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -90,6 +103,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.backupdriverV1 = backupdriverv1.New(c)
 	cs.snapshotV1beta1 = snapshotv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

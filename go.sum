@@ -336,6 +336,7 @@ github.com/kubernetes-csi/csi-lib-utils v0.7.0 h1:t1cS7HTD7z5D7h9iAdjWuHtMxJPb9s
 github.com/kubernetes-csi/csi-lib-utils v0.7.0/go.mod h1:bze+2G9+cmoHxN6+WyG1qT4MDxgZJMLGwc7V4acPNm0=
 github.com/kubernetes-csi/csi-test v2.0.0+incompatible h1:ia04uVFUM/J9n/v3LEMn3rEG6FmKV5BH9QLw7H68h44=
 github.com/kubernetes-csi/csi-test v2.0.0+incompatible/go.mod h1:YxJ4UiuPWIhMBkxUKY5c267DyA0uDZ/MtAimhx/2TA0=
+github.com/kubernetes-csi/external-snapshotter v1.2.2 h1:OPXoJydNqkWjhLwJ20dSqOhkmUYcpm+CCO0pYm+C8Q8=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/libopenstorage/openstorage v1.0.0/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wnOzEhNx2YQedreMcUyc=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=

@@ -20,6 +20,8 @@ package fake
 
 import (
 	clientset "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	backupdriverv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/backupdriver/v1"
+	fakebackupdriverv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/backupdriver/v1/fake"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	fakesnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +77,11 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// BackupdriverV1 retrieves the BackupdriverV1Client
+func (c *Clientset) BackupdriverV1() backupdriverv1.BackupdriverV1Interface {
+	return &fakebackupdriverv1.FakeBackupdriverV1{Fake: &c.Fake}
+}
 
 // SnapshotV1beta1 retrieves the SnapshotV1beta1Client
 func (c *Clientset) SnapshotV1beta1() snapshotv1beta1.SnapshotV1beta1Interface {

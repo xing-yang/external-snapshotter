@@ -1,0 +1,10 @@
+apiVersion: backupdriver.io/v1
+kind: Snapshot
+metadata:
+  name: backupdriver-snapshot
+spec:
+  resourceHandle:
+    name: backupdriver-pvc
+    kind: PersistentVolumeClaim
+  backupRepository: test
+  snapshotCancel: false

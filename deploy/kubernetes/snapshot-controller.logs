@@ -1,0 +1,31 @@
+I0701 13:37:41.872298       1 main.go:66] Version: v2.1.0-55-g4800ca72-dirty
+I0701 13:37:41.873596       1 main.go:93] Start NewCSISnapshotController with kubeconfig [] resyncPeriod [1m0s]
+I0701 13:37:41.873949       1 reflector.go:175] Starting reflector *v1beta1.VolumeSnapshot (1m0s) from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.873982       1 reflector.go:211] Listing and watching *v1beta1.VolumeSnapshot from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.874955       1 reflector.go:175] Starting reflector *v1beta1.VolumeSnapshotClass (1m0s) from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.874963       1 reflector.go:211] Listing and watching *v1beta1.VolumeSnapshotClass from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.875141       1 reflector.go:175] Starting reflector *v1.Snapshot (1m0s) from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.875148       1 reflector.go:211] Listing and watching *v1.Snapshot from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.875321       1 reflector.go:175] Starting reflector *v1beta1.VolumeSnapshotContent (1m0s) from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.875327       1 reflector.go:211] Listing and watching *v1beta1.VolumeSnapshotContent from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.875793       1 reflector.go:175] Starting reflector *v1.PersistentVolumeClaim (1m0s) from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.875799       1 reflector.go:211] Listing and watching *v1.PersistentVolumeClaim from pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125
+I0701 13:37:41.876060       1 snapshot_controller_base.go:163] Starting snapshot controller
+I0701 13:37:41.976613       1 shared_informer.go:253] caches populated
+I0701 13:37:41.976653       1 snapshot_controller_base.go:171] Xing: After WaitForCacheSync!!!
+I0701 13:37:41.976673       1 snapshot_controller_base.go:517] controller initialized
+I0701 13:37:41.976686       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 1
+I0701 13:37:41.976698       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 2
+I0701 13:37:41.976707       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 3
+I0701 13:37:41.976954       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 4
+I0701 13:37:41.976981       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 5
+I0701 13:37:41.976991       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 6
+I0701 13:37:41.977000       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 7
+I0701 13:37:41.977010       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 8
+I0701 13:37:41.977025       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 9
+I0701 13:37:41.977064       1 snapshot_controller_base.go:178] Xing: BackupdriverSnapshot Worker 10
+I0701 13:38:41.884151       1 reflector.go:336] pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125: forcing resync
+I0701 13:38:41.886071       1 reflector.go:336] pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125: forcing resync
+I0701 13:38:41.887606       1 reflector.go:336] pkg/mod/k8s.io/client-go@v0.18.0/tools/cache/reflector.go:125: forcing resync
+I0701 13:39:11.880283       1 snapshot_controller_base.go:204] Xing: Enter enqueueBackupdriverSnapshotWork &{TypeMeta:{Kind: APIVersion:} ObjectMeta:{Name:backupdriver-snapshot GenerateName: Namespace:default SelfLink:/apis/backupdriver.io/v1/namespaces/default/snapshots/backupdriver-snapshot UID:d2102002-b560-4c8d-8cec-bff666b302fa ResourceVersion:453 Generation:1 CreationTimestamp:2020-07-01 13:39:11 +0000 UTC DeletionTimestamp:<nil> DeletionGracePeriodSeconds:<nil> Labels:map[] Annotations:map[] OwnerReferences:[] Finalizers:[] ClusterName: ManagedFields:[]} Spec:{TypedLocalObjectReference:{APIGroup:<nil> Kind:PersistentVolumeClaim Name:backupdriver-pvc} BackupRepository:test SnapshotCancel:false} Status:{Phase: Message: Progress:{TotalBytes:0 BytesDone:0} SnapshotID: Metadata:[]}}
+I0701 13:39:11.880521       1 snapshot_controller_base.go:215] enqueued "default/backupdriver-snapshot" for sync

@@ -19,6 +19,7 @@ limitations under the License.
 package fake
 
 import (
+	backupdriverv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/backupdriver/v1"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 var parameterCodec = runtime.NewParameterCodec(scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
+	backupdriverv1.AddToScheme,
 	snapshotv1beta1.AddToScheme,
 }
 

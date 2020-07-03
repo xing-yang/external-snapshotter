@@ -100,6 +100,7 @@ func main() {
 		factory.Snapshot().V1beta1().VolumeSnapshotClasses(),
 		coreFactory.Core().V1().PersistentVolumeClaims(),
 		*resyncPeriod,
+		factory.Backupdriver().V1().Snapshots(),
 	)
 
 	run := func(context.Context) {

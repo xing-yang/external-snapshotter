@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	backupdriverv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/backupdriver/v1"
 	crdv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	clientset "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	backupdriverinformers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions/backupdriver/v1"
 	storageinformers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions/volumesnapshot/v1beta1"
+	backupdriverlisters "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/backupdriver/v1"
 	storagelisters "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 	"github.com/kubernetes-csi/external-snapshotter/v2/pkg/utils"
 
@@ -73,6 +76,10 @@ type csiSnapshotCommonController struct {
 	createSnapshotContentRetryCount int
 	createSnapshotContentInterval   time.Duration
 	resyncPeriod                    time.Duration
+
+	backupdriverSnapshotQueue  workqueue.RateLimitingInterface
+	backupdriverSnapshotLister backupdriverlisters.SnapshotLister
+	backupdriverSnapshotSynced cache.InformerSynced
 }
 
 // NewCSISnapshotController returns a new *csiSnapshotCommonController
@@ -84,6 +91,7 @@ func NewCSISnapshotCommonController(
 	volumeSnapshotClassInformer storageinformers.VolumeSnapshotClassInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	resyncPeriod time.Duration,
+	backupdriverInformer backupdriverinformers.SnapshotInformer,
 ) *csiSnapshotCommonController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.Infof)
@@ -103,6 +111,7 @@ func NewCSISnapshotCommonController(
 		contentStore:                    cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
 		snapshotQueue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "snapshot-controller-snapshot"),
 		contentQueue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "snapshot-controller-content"),
+		backupdriverSnapshotQueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "snapshot-controller-backupdriver"),
 	}
 
 	ctrl.pvcLister = pvcInformer.Lister()
@@ -118,6 +127,17 @@ func NewCSISnapshotCommonController(
 	)
 	ctrl.snapshotLister = volumeSnapshotInformer.Lister()
 	ctrl.snapshotListerSynced = volumeSnapshotInformer.Informer().HasSynced
+
+	backupdriverInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    func(obj interface{}) { ctrl.enqueueBackupdriverSnapshotWork(obj) },
+			UpdateFunc: func(oldObj, newObj interface{}) { ctrl.enqueueBackupdriverSnapshotWork(newObj) },
+			DeleteFunc: func(obj interface{}) { ctrl.enqueueBackupdriverSnapshotWork(obj) },
+		},
+		ctrl.resyncPeriod,
+	)
+	ctrl.backupdriverSnapshotLister = backupdriverInformer.Lister()
+	ctrl.backupdriverSnapshotSynced = backupdriverInformer.Informer().HasSynced
 
 	volumeSnapshotContentInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -143,16 +163,20 @@ func (ctrl *csiSnapshotCommonController) Run(workers int, stopCh <-chan struct{}
 	klog.Infof("Starting snapshot controller")
 	defer klog.Infof("Shutting snapshot controller")
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.contentListerSynced, ctrl.classListerSynced, ctrl.pvcListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.contentListerSynced, ctrl.classListerSynced, ctrl.pvcListerSynced, ctrl.backupdriverSnapshotSynced) {
 		klog.Errorf("Cannot sync caches")
 		return
 	}
+
+	klog.Infof("Xing: After WaitForCacheSync!!!")
 
 	ctrl.initializeCaches(ctrl.snapshotLister, ctrl.contentLister)
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(ctrl.snapshotWorker, 0, stopCh)
 		go wait.Until(ctrl.contentWorker, 0, stopCh)
+		klog.Infof("Xing: BackupdriverSnapshot Worker %d", i+1)
+		go wait.Until(ctrl.backupdriverSnapshotWorker, 0, stopCh)
 	}
 
 	<-stopCh
@@ -175,6 +199,24 @@ func (ctrl *csiSnapshotCommonController) enqueueSnapshotWork(obj interface{}) {
 	}
 }
 
+// enqueueBackupdriverSnapshotWork adds Backupdriver snapshot to given work queue.
+func (ctrl *csiSnapshotCommonController) enqueueBackupdriverSnapshotWork(obj interface{}) {
+	klog.V(5).Infof("Xing: Enter enqueueBackupdriverSnapshotWork %+v", obj)
+	// Beware of "xxx deleted" events
+	if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
+		obj = unknown.Obj
+	}
+	if backupdriverSnapshot, ok := obj.(*backupdriverv1.Snapshot); ok {
+		objName, err := cache.DeletionHandlingMetaNamespaceKeyFunc(backupdriverSnapshot)
+		if err != nil {
+			klog.Errorf("failed to get key from object: %v, %v", err, backupdriverSnapshot)
+			return
+		}
+		klog.V(5).Infof("enqueued %q for sync", objName)
+		ctrl.backupdriverSnapshotQueue.Add(objName)
+	}
+}
+
 // enqueueContentWork adds snapshot content to given work queue.
 func (ctrl *csiSnapshotCommonController) enqueueContentWork(obj interface{}) {
 	// Beware of "xxx deleted" events
@@ -190,6 +232,9 @@ func (ctrl *csiSnapshotCommonController) enqueueContentWork(obj interface{}) {
 		klog.V(5).Infof("enqueued %q for sync", objName)
 		ctrl.contentQueue.Add(objName)
 	}
+}
+
+func (ctrl *csiSnapshotCommonController) backupdriverSnapshotWorker() {
 }
 
 // snapshotWorker processes items from snapshotQueue. It must run only once,
