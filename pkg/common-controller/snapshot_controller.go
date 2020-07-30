@@ -328,7 +328,10 @@ func (ctrl *csiSnapshotCommonController) checkandRemoveSnapshotFinalizersAndChec
 	//    c. If deletion will not cascade to the content, remove the finalizer on
 	//       the snapshot such that it can be removed from API server.
 	removeBoundFinalizer := !(content != nil && deleteContent)
-	return ctrl.removeSnapshotFinalizer(snapshot, true, removeBoundFinalizer)
+	err = ctrl.removeSnapshotFinalizer(snapshot, true, removeBoundFinalizer)
+	// NOTE: If content != nil && !deleteContent (retain), we should removeContentFinalizer
+	err = utils.RemoveContentFinalizer(ctrl.clientset, content)
+	return err
 }
 
 // checkandAddSnapshotFinalizers checks and adds snapshot finailzers when needed

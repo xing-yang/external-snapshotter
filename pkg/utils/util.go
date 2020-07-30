@@ -424,3 +424,26 @@ func IsSnapshotReady(snapshot *crdv1.VolumeSnapshot) bool {
 	}
 	return true
 }
+
+// removeContentFinalizer removes the VolumeSnapshotContentFinalizer from a
+// content if there exists one.
+func RemoveContentFinalizer(clientset clientset.Interface, content *crdv1.VolumeSnapshotContent) error {
+        if !slice.ContainsString(content.ObjectMeta.Finalizers, VolumeSnapshotContentFinalizer, nil) {
+                // the finalizer does not exit, return directly
+                return nil
+        }
+        contentClone := content.DeepCopy()
+        contentClone.ObjectMeta.Finalizers = slice.RemoveString(contentClone.ObjectMeta.Finalizers, utils.VolumeSnapshotContentFinalizer, nil)
+
+        _, err := clientset.SnapshotV1beta1().VolumeSnapshotContents().Update(context.TODO(), contentClone, metav1.UpdateOptions{})
+        if err != nil {
+                return err //newControllerUpdateError(content.Name, err.Error())
+        }
+
+        klog.V(5).Infof("Removed protection finalizer from volume snapshot content %s", content.Name)
+        //_, err = ctrl.storeContentUpdate(contentClone)
+        //if err != nil {
+        //        klog.Errorf("failed to update content store %v", err)
+        //}
+        return nil
+}
