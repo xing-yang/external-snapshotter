@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	internalinterfaces "github.com/kubernetes-csi/external-snapshotter/client/v3/informers/externalversions/internalinterfaces"
+	internalinterfaces "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

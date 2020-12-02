@@ -27,7 +27,6 @@ require (
 )
 
 replace (
-	github.com/kubernetes-csi/external-snapshotter/client/v3 => ./client
 	k8s.io/api => k8s.io/api v0.19.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
