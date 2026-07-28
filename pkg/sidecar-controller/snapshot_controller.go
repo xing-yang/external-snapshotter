@@ -577,6 +577,11 @@ func (ctrl *csiSnapshotSideCarController) GetCredentialsFromAnnotation(content *
 			return nil, fmt.Errorf("cannot retrieve secrets for snapshot content %#v, err: secret name or namespace not specified", content.Name)
 		}
 
+		// Validate the secret namespace to prevent cross-namespace access
+		if err := ctrl.validateSecretNamespace(content, annDeletionSecretNamespace); err != nil {
+			return nil, fmt.Errorf("invalid secret namespace configuration for snapshot content %s: %v", content.Name, err)
+		}
+
 		snapshotterSecretRef.Name = annDeletionSecretName
 		snapshotterSecretRef.Namespace = annDeletionSecretNamespace
 
@@ -589,6 +594,20 @@ func (ctrl *csiSnapshotSideCarController) GetCredentialsFromAnnotation(content *
 	}
 
 	return snapshotterCredentials, nil
+}
+
+// validateSecretNamespace validates that the secret namespace is appropriate for the given VolumeSnapshotContent.
+// This prevents cross-namespace secret access which is likely a configuration error.
+func (ctrl *csiSnapshotSideCarController) validateSecretNamespace(content *crdv1.VolumeSnapshotContent, secretNamespace string) error {
+	// If the VolumeSnapshotContent references a VolumeSnapshot, the secret should be in the same namespace
+	if content.Spec.VolumeSnapshotRef.Namespace != "" {
+		expectedNamespace := content.Spec.VolumeSnapshotRef.Namespace
+		if secretNamespace != expectedNamespace {
+			return fmt.Errorf("secret namespace %q must match VolumeSnapshot namespace %q to prevent cross-namespace access",
+				secretNamespace, expectedNamespace)
+		}
+	}
+	return nil
 }
 
 // removeContentFinalizer removes the VolumeSnapshotContentFinalizer from a

@@ -323,6 +323,11 @@ func (ctrl *csiSnapshotSideCarController) GetCredentialsFromAnnotationForGroupSn
 			return nil, fmt.Errorf("cannot retrieve secrets for group snapshot content %#v, err: secret name or namespace not specified", groupSnapshotContent.Name)
 		}
 
+		// Validate the secret namespace to prevent cross-namespace access
+		if err := ctrl.validateGroupSecretNamespace(groupSnapshotContent, annDeletionSecretNamespace); err != nil {
+			return nil, fmt.Errorf("invalid secret namespace configuration for group snapshot content %s: %v", groupSnapshotContent.Name, err)
+		}
+
 		snapshotterSecretRef.Name = annDeletionSecretName
 		snapshotterSecretRef.Namespace = annDeletionSecretNamespace
 
@@ -335,6 +340,20 @@ func (ctrl *csiSnapshotSideCarController) GetCredentialsFromAnnotationForGroupSn
 	}
 
 	return snapshotterCredentials, nil
+}
+
+// validateGroupSecretNamespace validates that the secret namespace is appropriate for the given VolumeGroupSnapshotContent.
+// This prevents cross-namespace secret access which is likely a configuration error.
+func (ctrl *csiSnapshotSideCarController) validateGroupSecretNamespace(groupSnapshotContent *groupsnapshotv1.VolumeGroupSnapshotContent, secretNamespace string) error {
+	// If the VolumeGroupSnapshotContent references a VolumeGroupSnapshot, the secret should be in the same namespace
+	if groupSnapshotContent.Spec.VolumeGroupSnapshotRef.Namespace != "" {
+		expectedNamespace := groupSnapshotContent.Spec.VolumeGroupSnapshotRef.Namespace
+		if secretNamespace != expectedNamespace {
+			return fmt.Errorf("secret namespace %q must match VolumeGroupSnapshot namespace %q to prevent cross-namespace access",
+				secretNamespace, expectedNamespace)
+		}
+	}
+	return nil
 }
 
 // shouldDeleteGroupSnapshotContent checks if groupSnapshotContent object should be deleted
